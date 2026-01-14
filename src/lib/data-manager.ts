@@ -32,16 +32,37 @@ export async function getTransactionsFromCSV(): Promise<Transaction[]> {
         return [];
     }
 
-    const { data, error } = await supabaseAdmin
-        .from('transactions')
-        .select('*')
-        .order('date', { ascending: false })
-        .limit(100000);
+    let allData: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (error) {
-        console.error('Error fetching transactions:', error);
-        return [];
+    while (hasMore) {
+        const { data, error } = await supabaseAdmin
+            .from('transactions')
+            .select('*')
+            .order('date', { ascending: false })
+            .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) {
+            console.error('Error fetching transactions:', error);
+            break;
+        }
+
+        if (data) {
+            allData = [...allData, ...data];
+            if (data.length < pageSize) {
+                hasMore = false;
+            } else {
+                page++;
+            }
+        } else {
+            hasMore = false;
+        }
     }
+
+    // Map the aggregated data
+    const data = allData;
 
     return data.map((t: any) => ({
         id: t.id,
