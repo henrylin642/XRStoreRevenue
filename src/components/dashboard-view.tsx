@@ -182,8 +182,16 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
 
     // Invoice Tab State
     const [invoiceSubTab, setInvoiceSubTab] = useState<'list' | 'anomaly'>('list');
-    const [invoiceStartDate, setInvoiceStartDate] = useState<string>('');
-    const [invoiceEndDate, setInvoiceEndDate] = useState<string>('');
+
+    // Default Date Range: 1st of current month to Today
+    const [invoiceStartDate, setInvoiceStartDate] = useState<string>(() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    });
+    const [invoiceEndDate, setInvoiceEndDate] = useState<string>(() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    });
     const [invoicePaymentFilter, setInvoicePaymentFilter] = useState<string>('All');
 
     // Payment Method Options
