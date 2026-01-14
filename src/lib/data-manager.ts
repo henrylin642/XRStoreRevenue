@@ -35,7 +35,8 @@ export async function getTransactionsFromCSV(): Promise<Transaction[]> {
     const { data, error } = await supabaseAdmin
         .from('transactions')
         .select('*')
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })
+        .limit(100000);
 
     if (error) {
         console.error('Error fetching transactions:', error);
