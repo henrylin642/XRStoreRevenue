@@ -166,14 +166,29 @@ export async function mergeExcelData(fileBuffer: Buffer) {
         let dateRaw = row['交易時間'] || row['日期'] || row['Date'] || row['date'];
 
         let dateStr = '';
+        const TZ_OFFSET = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+
         if (typeof dateRaw === 'number') {
-            // Excel serial date
+            // Excel serial date. parse_date_code returns the time components as written in the cell.
+            // E.g., if cell says 15:30, it returns H=15, M=30.
             const date = XLSX.SSF.parse_date_code(dateRaw);
-            dateStr = new Date(Date.UTC(date.y, date.m - 1, date.d, date.H, date.M, date.S)).toISOString();
+
+            // We treat these components as GMT+8 (Taipei Time).
+            // First, construct a UTC timestamp as if it were UTC (e.g. 15:30Z)
+            const asUtc = Date.UTC(date.y, date.m - 1, date.d, date.H, date.M, date.S);
+
+            // Then subtract 8 hours to shift back to true UTC (e.g. 15:30 - 8h = 07:30Z)
+            dateStr = new Date(asUtc - TZ_OFFSET).toISOString();
         } else if (dateRaw) {
             // String date
-            // Replace space with T if needed or parse directly
-            const d = new Date(dateRaw);
+            let str = String(dateRaw).trim();
+
+            // If strictly "YYYY-MM-DD HH:mm:ss", treat as GMT+8 by appending offset
+            if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/.test(str)) {
+                str = str.replace(' ', 'T') + '+08:00';
+            }
+
+            const d = new Date(str);
             if (!isNaN(d.getTime())) {
                 dateStr = d.toISOString();
             }
