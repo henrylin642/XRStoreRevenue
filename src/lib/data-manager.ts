@@ -59,13 +59,13 @@ export async function getTransactionsFromCSV(): Promise<Transaction[]> {
 export async function migrateLocalDataToSupabase() {
     console.log('Starting migration...');
     if (!supabase) throw new Error('Supabase client missing');
-    
+
     // Read local CSV
     const csvPath = path.join(process.cwd(), 'public/data/record.csv');
     try {
         const fileContent = await fs.readFile(csvPath, 'utf-8');
         const rows = fileContent.split('\n').filter(r => r.trim() !== '').slice(1); // skip header
-        
+
         const records = rows.map(row => {
             const cols = row.split(',');
             // CSV columns: id, invoiceNumber, date, amount, paymentMethod
@@ -107,50 +107,88 @@ export async function mergeExcelData(fileBuffer: Buffer) {
     const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(sheet);
+
+    // 1. Find the header row
+    // We look for a row containing '訂單編號' (Order ID)
+    const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+    let headerRowIndex = -1;
+
+    for (let i = 0; i < Math.min(rawData.length, 20); i++) {
+        const row = rawData[i];
+        if (row && (row.includes('訂單編號') || row.includes('Order ID'))) {
+            headerRowIndex = i;
+            break;
+        }
+    }
+
+    if (headerRowIndex === -1) {
+        console.warn('Could not find header row (looking for "訂單編號"), executing with default behavior (header at 0).');
+        headerRowIndex = 0;
+    }
+
+    // 2. Parse using the found header row
+    const jsonData = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex });
 
     let added = 0;
     let duplicates = 0;
 
     // Process and Map Data
-    // Assuming Excel columns map somewhat to our needs. 
-    // We need to identify columns. 
-    // Based on previous CSV structure: 訂單編號, 發票號碼, 日期, 金額, 付款方式
-    
     const records = jsonData.map((row: any) => {
-        // Mapping logic (adjust based on actual Excel headers if known, here guessing based on standard formats)
-        // Fallback to known column names or trying to find them
+        // Mapping logic
         const id = row['訂單編號'] || row['Order ID'] || row['id'];
         const invoiceNumber = row['發票號碼'] || row['Invoice Number'] || row['invoiceNumber'];
-        // Date parsing might be tricky from Excel, assuming string or serial
-        const dateRaw = row['日期'] || row['Date'] || row['date'];
-        
+
+        // Date parsing: Support '交易時間', '日期', 'Date'
+        let dateRaw = row['交易時間'] || row['日期'] || row['Date'] || row['date'];
+
+        let dateStr = '';
+        if (typeof dateRaw === 'number') {
+            // Excel serial date
+            const date = XLSX.SSF.parse_date_code(dateRaw);
+            dateStr = new Date(Date.UTC(date.y, date.m - 1, date.d, date.H, date.M, date.S)).toISOString();
+        } else if (dateRaw) {
+            // String date
+            // Replace space with T if needed or parse directly
+            const d = new Date(dateRaw);
+            if (!isNaN(d.getTime())) {
+                dateStr = d.toISOString();
+            }
+        }
+
+        const amount = Number(row['交易金額'] || row['金額'] || row['Amount'] || row['amount'] || 0);
+        const paymentMethod = String(row['支付方式'] || row['付款方式'] || row['Payment Method'] || row['paymentMethod'] || '其他');
+        const transactionType = row['交易類型'] || '交易成功';
+        const paymentStatus = row['支付交易類型'] || '付款成功';
+        // Note: invoiceStatus is not always available, defaulting to '已開立'
+        const invoiceStatus = row['發票狀態'] || '已開立';
+        const storeName = row['店鋪名稱'] || 'Unknown';
+
         // Basic validation
-        if (!id || !dateRaw) return null;
+        if (!id || !dateStr) return null;
 
         return {
             id: String(id),
             invoice_number: String(invoiceNumber || ''),
-            date: new Date(dateRaw).toISOString(), // Formatting might be needed
-            amount: Number(row['金額'] || row['Amount'] || row['amount'] || 0),
-            payment_method: String(row['付款方式'] || row['Payment Method'] || row['paymentMethod'] || '其他'),
-            payment_status: '付款成功',
-            transaction_type: '交易成功'
+            date: dateStr,
+            amount: amount,
+            payment_method: paymentMethod,
+            payment_status: paymentStatus,
+            transaction_type: transactionType
         };
     }).filter(r => r !== null);
 
     if (records.length > 0) {
         // Upsert to Supabase
         const { error } = await supabase.from('transactions').upsert(records, { onConflict: 'id' });
-        
+
         if (error) {
             console.error('Error merging Excel data:', error);
             throw error;
         }
-        
+
         // In upsert, we don't easily know how many were updates vs inserts without checking first.
         // For now, we report all as "added/processed".
-        added = records.length; 
+        added = records.length;
     }
 
     return { added, duplicates: 0 };
