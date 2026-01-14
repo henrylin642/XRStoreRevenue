@@ -26,12 +26,13 @@ export interface Transaction extends TransactionRecord {
 
 export async function getTransactionsFromCSV(): Promise<Transaction[]> {
     // This function name is kept for compatibility, but it now fetches from Supabase
-    if (!supabase) {
-        console.warn('Supabase client not initialized. Missing env vars?');
+    // Use admin client to bypass RLS for reading data as well
+    if (!supabaseAdmin) {
+        console.warn('Supabase admin client not initialized. Missing env vars?');
         return [];
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from('transactions')
         .select('*')
         .order('date', { ascending: false });
