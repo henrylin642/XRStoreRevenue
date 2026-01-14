@@ -1,0 +1,25 @@
+
+import pandas as pd
+import json
+
+file_path = "public/data/智慧刷卡機交易紀錄_202510.xlsx"
+try:
+    df = pd.read_excel(file_path)
+    # Output columns and types
+    schema = {
+        "columns": list(df.columns),
+        "dtypes": {col: str(df[col].dtype) for col in df.columns},
+        "sample_data": df.head(3).to_dict(orient='records'),
+        "row_count": len(df)
+    }
+    
+    # Custom encoder for Timestamp objects
+    class DateTimeEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, pd.Timestamp):
+                return obj.isoformat()
+            return super().default(obj)
+
+    print(json.dumps(schema, ensure_ascii=False, indent=2, cls=DateTimeEncoder))
+except Exception as e:
+    print(f"Error reading file: {e}")
