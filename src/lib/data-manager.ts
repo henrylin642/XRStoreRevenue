@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -58,7 +59,7 @@ export async function getTransactionsFromCSV(): Promise<Transaction[]> {
 // Should be called manually or via a special admin route
 export async function migrateLocalDataToSupabase() {
     console.log('Starting migration...');
-    if (!supabase) throw new Error('Supabase client missing');
+    if (!supabaseAdmin) throw new Error('Supabase admin client missing');
 
     // Read local CSV
     const csvPath = path.join(process.cwd(), 'public/data/record.csv');
@@ -86,7 +87,7 @@ export async function migrateLocalDataToSupabase() {
         const batchSize = 100;
         for (let i = 0; i < records.length; i += batchSize) {
             const batch = records.slice(i, i + batchSize);
-            const { error } = await supabase.from('transactions').upsert(batch, { onConflict: 'id' });
+            const { error } = await supabaseAdmin.from('transactions').upsert(batch, { onConflict: 'id' });
             if (error) console.error('Batch insert error:', error);
             else console.log(`Inserted batch ${i} - ${i + batch.length}`);
         }
@@ -102,7 +103,7 @@ export async function migrateLocalDataToSupabase() {
 import * as XLSX from 'xlsx';
 
 export async function mergeExcelData(fileBuffer: Buffer) {
-    if (!supabase) throw new Error('Supabase client missing');
+    if (!supabaseAdmin) throw new Error('Supabase admin client missing');
 
     const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
@@ -179,7 +180,7 @@ export async function mergeExcelData(fileBuffer: Buffer) {
 
     if (records.length > 0) {
         // Upsert to Supabase
-        const { error } = await supabase.from('transactions').upsert(records, { onConflict: 'id' });
+        const { error } = await supabaseAdmin.from('transactions').upsert(records, { onConflict: 'id' });
 
         if (error) {
             console.error('Error merging Excel data:', error);
