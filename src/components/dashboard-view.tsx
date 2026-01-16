@@ -743,7 +743,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                 return { date: dateStr, amount, txId, status };
             }
         },
-        '掃碼-iPASS Money': {
+        '掃碼-iPass MONEY': {
             dateFields: ['交易日期', '日期'],
             timeFields: ['時間'],
             amountFields: ['支付金額', '交易金額', '金額'],
@@ -974,7 +974,12 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
 
         // 1. Filter system records for Selected Payment Method AND date range
         const systemRecords = parsedData.filter(t => {
-            if (t.paymentMethod !== reconPaymentMethod || t.type !== '交易成功') return false;
+            // Case-insensitive payment method matching
+            const sysMethod = (t.paymentMethod || '').toLowerCase();
+            const targetMethod = reconPaymentMethod.toLowerCase();
+            if (sysMethod !== targetMethod && t.paymentMethod !== reconPaymentMethod) return false;
+
+            if (t.type !== '交易成功') return false;
 
             // Format date to YYYY-MM-DD for comparison
             const dateStr = `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
@@ -1504,7 +1509,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                     <option value="掃碼-悠遊付">掃碼-悠遊付</option>
                                     <option value="電子票證-悠遊卡-小額">電子票證-悠遊卡-小額</option>
                                     <option value="電子票證-一卡通-小額">電子票證-一卡通-小額</option>
-                                    <option value="掃碼-iPASS Money">掃碼-iPASS Money</option>
+                                    <option value="掃碼-iPass MONEY">掃碼-iPass MONEY</option>
                                 </select>
                                 <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm font-medium cursor-pointer hover:bg-blue-700 transition-colors">
                                     <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handlePlatformUpload} />
