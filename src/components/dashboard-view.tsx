@@ -1197,7 +1197,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                         setReconStartDate(formatDate(firstDayThisMonth));
                                         setReconEndDate(formatDate(lastDayThisMonth));
                                     }}
-                                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-colors border border-blue-100"
+                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
                                 >
                                     本月
                                 </button>
