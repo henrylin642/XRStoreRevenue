@@ -502,6 +502,8 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
     // Reconciliation State
     const [platformData, setPlatformData] = useState<any[]>([]);
     const [isMatching, setIsMatching] = useState(false);
+    const [reconStartDate, setReconStartDate] = useState('2026-01-01');
+    const [reconEndDate, setReconEndDate] = useState('2026-01-31');
 
     const handlePlatformUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
@@ -526,6 +528,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     const dateRaw = row['訂單交易日期'] || row['支付日期'] || row['交易時間'] || row['交易日期'] || row['Date'] || row['時間'] || row['訂單日期'] || row['交易時間(台北時間)'];
                     const amount = Number(row['主支付金額'] || row['特店支付金額'] || row['主支付數值(金額)'] || row['交易金額'] || row['金額'] || row['Amount'] || row['金額(TWD)'] || 0);
                     const txId = row['特店訂單編號'] || row['藍新金流訂單編號'] || row['訂單編號'] || row['交易編號'] || row['Transaction ID'] || row['序號'] || row['藍新序號'] || row['平台單號'] || '-';
+                    const status = row['訂單交易狀態'] || row['交易狀態'] || row['Status'] || '已付款';
 
                     let dateStr = '';
                     if (dateRaw) {
@@ -544,12 +547,19 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                         date: dateStr,
                         amount,
                         txId,
+                        status,
                         raw: row
                     };
-                }).filter(r => r.date !== '');
+                }).filter(r => {
+                    // Critical: Filter for paid status and valid date
+                    if (r.date === '') return false;
+                    // If CSV has status column, only keep Paid/Success
+                    if (r.status && !['已付款', '付款成功', '成功', 'Success', 'Paid'].includes(r.status)) return false;
+                    return true;
+                });
 
                 if (parsed.length === 0) {
-                    alert('讀取失敗：找不到有效的日期資料，請檢查表格標題。');
+                    alert('讀取失敗：找不到有效的日期資料或已付款記錄，請檢查表格內容與標題。');
                 } else {
                     setPlatformData(parsed);
                 }
@@ -564,19 +574,35 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
     const reconciliationMatches = useMemo(() => {
         if (!platformData.length) return [];
 
-        // Filter system records for General Credit Card
-        const systemRecords = parsedData.filter(t => t.paymentMethod === '一般信用卡' && t.type === '交易成功');
+        // 1. Filter system records for General Credit Card AND selected date range
+        const systemRecords = parsedData.filter(t => {
+            if (t.paymentMethod !== '一般信用卡' || t.type !== '交易成功') return false;
+
+            // Format date to YYYY-MM-DD for comparison
+            const dateStr = `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
+            if (reconStartDate && dateStr < reconStartDate) return false;
+            if (reconEndDate && dateStr > reconEndDate) return false;
+            return true;
+        });
+
+        // 2. Filter platform data by date range
+        const filteredPlatformData = platformData.filter(plat => {
+            const dateStr = plat.date.split('T')[0];
+            if (reconStartDate && dateStr < reconStartDate) return false;
+            if (reconEndDate && dateStr > reconEndDate) return false;
+            return true;
+        });
 
         const matchedPlatformIndices = new Set<number>();
         const matches: { system?: any, platform?: any, status: 'matched' | 'mismatch' | 'missing_system' | 'missing_platform' }[] = [];
 
-        // 1. Try to match each system record
+        // 3. Try to match each system record
         systemRecords.forEach(sys => {
             const sysTime = new Date(sys.date).getTime();
             let bestMatchIdx = -1;
             let minDiff = 60 * 1000; // 60 seconds tolerance
 
-            platformData.forEach((plat, pIdx) => {
+            filteredPlatformData.forEach((plat, pIdx) => {
                 if (matchedPlatformIndices.has(pIdx)) return;
                 if (Math.abs(plat.amount - sys.amount) > 0.1) return; // Amount mismatch
 
@@ -592,7 +618,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                 matchedPlatformIndices.add(bestMatchIdx);
                 matches.push({
                     system: sys,
-                    platform: platformData[bestMatchIdx],
+                    platform: filteredPlatformData[bestMatchIdx],
                     status: 'matched'
                 });
             } else {
@@ -603,8 +629,8 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
             }
         });
 
-        // 2. Add unmatched platform records
-        platformData.forEach((plat, pIdx) => {
+        // 4. Add unmatched platform records
+        filteredPlatformData.forEach((plat, pIdx) => {
             if (!matchedPlatformIndices.has(pIdx)) {
                 matches.push({
                     platform: plat,
@@ -619,7 +645,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
             const timeB = new Date(b.system?.date || b.platform?.date).getTime();
             return timeB - timeA; // Descending
         });
-    }, [parsedData, platformData]);
+    }, [parsedData, platformData, reconStartDate, reconEndDate]);
 
     useEffect(() => {
         const year = 2026;
@@ -994,7 +1020,23 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                 <h3 className="text-lg font-bold text-slate-800">對帳中心</h3>
                                 <p className="text-sm text-slate-500">比對系統發票與平台交易數據 (依金額及時間自動匹配)</p>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+                                    <span className="text-xs text-slate-500">從</span>
+                                    <input
+                                        type="date"
+                                        value={reconStartDate}
+                                        onChange={(e) => setReconStartDate(e.target.value)}
+                                        className="bg-transparent text-sm text-slate-700 outline-none"
+                                    />
+                                    <span className="text-xs text-slate-500">至</span>
+                                    <input
+                                        type="date"
+                                        value={reconEndDate}
+                                        onChange={(e) => setReconEndDate(e.target.value)}
+                                        className="bg-transparent text-sm text-slate-700 outline-none"
+                                    />
+                                </div>
                                 <select className="bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
                                     <option>一般信用卡</option>
                                 </select>
