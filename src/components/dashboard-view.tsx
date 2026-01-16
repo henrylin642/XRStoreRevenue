@@ -257,9 +257,9 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
         // Date Range Filter (Overrides global Year/Month if set)
         if (invoiceStartDate || invoiceEndDate) {
             data = data.filter(t => {
-                const d = t.date.split(' ')[0]; // YYYY-MM-DD
-                if (invoiceStartDate && d < invoiceStartDate) return false;
-                if (invoiceEndDate && d > invoiceEndDate) return false;
+                const dStr = `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
+                if (invoiceStartDate && dStr < invoiceStartDate) return false;
+                if (invoiceEndDate && dStr > invoiceEndDate) return false;
                 return true;
             });
         } else {
@@ -293,9 +293,9 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
         // Date Range Filter (Same logic as above)
         if (invoiceStartDate || invoiceEndDate) {
             data = data.filter(t => {
-                const d = t.date.split(' ')[0];
-                if (invoiceStartDate && d < invoiceStartDate) return false;
-                if (invoiceEndDate && d > invoiceEndDate) return false;
+                const dStr = `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
+                if (invoiceStartDate && dStr < invoiceStartDate) return false;
+                if (invoiceEndDate && dStr > invoiceEndDate) return false;
                 return true;
             });
         } else {
