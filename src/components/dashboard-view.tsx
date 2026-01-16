@@ -609,7 +609,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     }
                 }
 
-                data = XLSX.utils.sheet_to_json(ws, { raw: true, range: headerIndex });
+                data = XLSX.utils.sheet_to_json(ws, { raw: false, range: headerIndex });
 
                 if (!data || data.length === 0) {
                     alert('讀取失敗：檔案內容為空或無法解析');
@@ -625,24 +625,25 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                         const cleanKey = k.replace(/[^\x20-\x7E\s\u4E00-\u9FFF]/g, '').trim();
                         let val: any = v;
 
-                        // Prevent scientific notation for large numbers (IDs, RRNs)
-                        if (typeof v === 'number' && v > 1000000) {
-                            val = v.toFixed(0);
-                        } else if (typeof v === 'string') {
+                        if (typeof v === 'string') {
                             let strVal = v;
                             if (strVal.startsWith('="') && strVal.endsWith('"')) {
                                 strVal = strVal.substring(2, strVal.length - 1);
                             } else if (strVal.startsWith('"') && strVal.endsWith('"')) {
                                 strVal = strVal.substring(1, strVal.length - 1);
                             }
-                            // Clean internal newlines and extra spaces
-                            val = strVal.replace(/\s+/g, ' ').trim();
 
-                            // Check for strings that XLSX might have formatted as scientific notation
+                            // For HTML-based Excel (.xls from EasyCard), date and time are often separated by newlines
+                            // Preserve the split with a space for date parsing later
+                            val = strVal.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+                            // Prevent scientific notation if XLSX tried to format it that way in a string
                             if (/^\d\.\d+E\+\d+$/i.test(val)) {
                                 const num = Number(val);
                                 if (!isNaN(num)) val = num.toFixed(0);
                             }
+                        } else if (typeof v === 'number' && v > 10000000) {
+                            val = v.toFixed(0);
                         }
                         cleanRow[cleanKey] = val;
                     });
@@ -665,43 +666,33 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     let dateStr = '';
                     if (rawDate) {
                         let combinedDate: Date | null = null;
+                        let dateStrForParsing = '';
 
-                        // Check if it is a Date object (usually from XLSX)
                         if (rawDate instanceof Date) {
-                            // Important: XLSX dates are often parsed as UTC representing local time.
-                            // To display correctly in Taipei time (+8), we subtract 8 hours here so that
-                            // the final ISO string + Taipei display matches the local time in the file.
-                            combinedDate = new Date(rawDate.getTime() - (8 * 3600 * 1000));
+                            // Treat UTC components as local (Taipei)
+                            dateStrForParsing = `${rawDate.getUTCFullYear()}-${String(rawDate.getUTCMonth() + 1).padStart(2, '0')}-${String(rawDate.getUTCDate()).padStart(2, '0')} ${String(rawDate.getUTCHours()).padStart(2, '0')}:${String(rawDate.getUTCMinutes()).padStart(2, '0')}:${String(rawDate.getUTCSeconds()).padStart(2, '0')}`;
                         } else if (typeof rawDate === 'number') {
-                            // Serial date from Excel - SSF approach is usually safer
                             try {
                                 const date = XLSX.SSF.parse_date_code(rawDate);
-                                const asUtc = Date.UTC(date.y, date.m - 1, date.d, date.H, date.M, date.S);
-                                combinedDate = new Date(asUtc - (8 * 3600 * 1000));
+                                dateStrForParsing = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')} ${String(date.H).padStart(2, '0')}:${String(date.M).padStart(2, '0')}:${String(date.S).padStart(2, '0')}`;
                             } catch (e) {
-                                combinedDate = new Date(Math.round((rawDate - 25569) * 864e5) - (8 * 3600 * 1000));
+                                const d = new Date(Math.round((rawDate - 25569) * 864e5));
+                                dateStrForParsing = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}:${String(d.getUTCSeconds()).padStart(2, '0')}`;
                             }
                         } else {
-                            let fullStr = String(rawDate).trim();
-
-                            // Special handling for LINE Pay YYYYMMDDHHMMSS (14 digits)
-                            if (/^\d{14}$/.test(fullStr)) {
-                                fullStr = `${fullStr.substring(0, 4)}-${fullStr.substring(4, 6)}-${fullStr.substring(6, 8)} ${fullStr.substring(8, 10)}:${fullStr.substring(10, 12)}:${fullStr.substring(12, 14)}`;
-                            }
+                            let fullStr = String(rawDate).trim().replace(/\//g, '-');
 
                             if (rawTime && !fullStr.includes(':')) {
                                 fullStr += ' ' + String(rawTime).trim();
                             }
+                            dateStrForParsing = fullStr;
+                        }
 
-                            // Remove any existing timezone suffix to force +0800
-                            const cleanDateStr = fullStr.replace(/\s*[+-]\d{4}$/, '').replace(/Z$/, '').replace(/\//g, '-');
-
-                            // If no timezone, force +0800
-                            if (!cleanDateStr.includes('+') && !cleanDateStr.includes('Z')) {
-                                combinedDate = new Date(cleanDateStr + ' +0800');
-                            } else {
-                                combinedDate = new Date(cleanDateStr);
-                            }
+                        // Force Taipei timezone (+08:00) for parsing local report times
+                        if (dateStrForParsing) {
+                            // Remove any existing Z or timezone at end for consistency
+                            const clean = dateStrForParsing.replace(/\s*[+-]\d{2}(:?\d{2})?$/, '').replace(/Z$/, '');
+                            combinedDate = new Date(clean + ' +08:00');
                         }
 
                         if (combinedDate && !isNaN(combinedDate.getTime())) {
