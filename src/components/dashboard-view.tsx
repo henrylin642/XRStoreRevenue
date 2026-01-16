@@ -9,7 +9,7 @@ import { Transaction } from '@/lib/data-manager';
 import {
     CloudRain, CreditCard, Ticket, DollarSign, Calendar, TrendingUp, AlertTriangle, CheckCircle, Users,
     Thermometer, Sun, Cloud, CloudSnow, CloudLightning, FileText, Smartphone as SmartphoneIcon,
-    Info, Trash2, X
+    Info, Trash2, X, Printer
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getVisitorStats, getDailyVisitorStats } from '@/lib/visitor-data';
@@ -1069,14 +1069,51 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
 
             {/* Reconciliation Tab */}
             {activeTab === 'reconciliation' && (
-                <div className="space-y-6 animate-in fade-in duration-500">
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div className="space-y-6 animate-in fade-in duration-500 print:m-0 print:p-0">
+                    {/* Print CSS */}
+                    <style dangerouslySetInnerHTML={{
+                        __html: `
+                        @media print {
+                            body * { visibility: hidden; }
+                            .print-section, .print-section * { visibility: visible; }
+                            .print-section { 
+                                position: absolute; 
+                                left: 0; 
+                                top: 0; 
+                                width: 100%; 
+                                padding: 0 !important;
+                                margin: 0 !important;
+                                border: none !important;
+                                box-shadow: none !important;
+                            }
+                            .no-print { display: none !important; }
+                            table { font-size: 10px !important; }
+                            th, td { padding: 4px !important; border: 1px solid #e2e8f0 !important; }
+                            .bg-red-50\\/30 { background-color: #fef2f2 !important; -webkit-print-color-adjust: exact; }
+                            .text-red-500 { color: #ef4444 !important; }
+                        }
+                    `}} />
+
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 print-section">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 no-print">
                             <div>
                                 <h3 className="text-lg font-bold text-slate-800">對帳中心</h3>
                                 <p className="text-sm text-slate-500">比對系統發票與平台交易數據 (依金額及時間自動匹配)</p>
                             </div>
                             <div className="flex flex-wrap items-center gap-3">
+                                <button
+                                    onClick={() => {
+                                        const now = new Date();
+                                        const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                                        const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+                                        const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                        setReconStartDate(formatDate(firstDayLastMonth));
+                                        setReconEndDate(formatDate(lastDayLastMonth));
+                                    }}
+                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
+                                >
+                                    上個月
+                                </button>
                                 <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
                                     <span className="text-xs text-slate-500">從</span>
                                     <input
@@ -1101,6 +1138,17 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                     <CloudRain className="w-4 h-4" />
                                     <span>上傳平台數據</span>
                                 </label>
+                            </div>
+                        </div>
+
+                        {/* Print Header (Visible only when printing) */}
+                        <div className="hidden print:block mb-6 border-b-2 border-slate-800 pb-4">
+                            <h2 className="text-2xl font-black text-slate-900">對帳明細報表</h2>
+                            <div className="flex justify-between items-end mt-2">
+                                <p className="text-slate-600 text-sm">
+                                    對帳區間：<span className="font-bold">{reconStartDate}</span> 至 <span className="font-bold">{reconEndDate}</span>
+                                </p>
+                                <p className="text-slate-400 text-xs">列印日期：{new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</p>
                             </div>
                         </div>
 
@@ -1200,16 +1248,24 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                         )}
 
                         {platformData.length > 0 && (
-                            <div className="mt-4 flex justify-end">
+                            <div className="mt-6 flex items-center justify-between no-print">
+                                <button
+                                    onClick={() => window.print()}
+                                    className="flex items-center gap-2 px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-all shadow-lg active:scale-95"
+                                >
+                                    <Printer className="w-4 h-4" />
+                                    <span>列印對帳狀態</span>
+                                </button>
+
                                 <button
                                     onClick={() => {
                                         setPlatformData([]);
                                         setIsMatching(false);
                                     }}
-                                    className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-red-600 font-medium transition-colors"
+                                    className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-red-500 font-medium transition-colors text-sm"
                                 >
                                     <Trash2 className="w-4 h-4" />
-                                    <span>清除並重新上傳</span>
+                                    <span>清除目前比對資料</span>
                                 </button>
                             </div>
                         )}
