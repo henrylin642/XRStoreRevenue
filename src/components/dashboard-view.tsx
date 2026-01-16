@@ -524,7 +524,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                 const parsed = data.map((row: any) => {
                     // Try various common column names for time, amount, and ID
                     const dateRaw = row['訂單交易日期'] || row['支付日期'] || row['交易時間'] || row['交易日期'] || row['Date'] || row['時間'] || row['訂單日期'] || row['交易時間(台北時間)'];
-                    const amount = Number(row['特店支付金額'] || row['主支付數值(金額)'] || row['交易金額'] || row['金額'] || row['Amount'] || row['金額(TWD)'] || 0);
+                    const amount = Number(row['主支付金額'] || row['特店支付金額'] || row['主支付數值(金額)'] || row['交易金額'] || row['金額'] || row['Amount'] || row['金額(TWD)'] || 0);
                     const txId = row['特店訂單編號'] || row['藍新金流訂單編號'] || row['訂單編號'] || row['交易編號'] || row['Transaction ID'] || row['序號'] || row['藍新序號'] || row['平台單號'] || '-';
 
                     let dateStr = '';
@@ -574,7 +574,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
         systemRecords.forEach(sys => {
             const sysTime = new Date(sys.date).getTime();
             let bestMatchIdx = -1;
-            let minDiff = 5 * 60 * 1000; // 5 mins tolerance
+            let minDiff = 60 * 1000; // 60 seconds tolerance
 
             platformData.forEach((plat, pIdx) => {
                 if (matchedPlatformIndices.has(pIdx)) return;
