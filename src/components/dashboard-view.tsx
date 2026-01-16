@@ -551,6 +551,14 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
             idFields: ['交易號碼', '訂單號碼'],
             statusFields: ['交易狀態', '付款狀態'],
             successStatuses: ['PAYMENT', 'CAPTURE', '成功', 'SUCCESS', 'Paid']
+        },
+        '掃碼-悠遊付': {
+            dateFields: ['訂單時間', '交易時間', '日期'],
+            timeFields: ['時間'],
+            amountFields: ['訂單金額', '交易金額', '金額'],
+            idFields: ['悠遊付訂單編號', '商店訂單編號', '訂單編號'],
+            statusFields: ['訂單狀態', '狀態'],
+            successStatuses: ['已完成', '成功', 'SUCCESS', 'Paid']
         }
     };
 
@@ -574,8 +582,26 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
 
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
-                // Use raw: false to get formatted strings from cells, which helps with date formats
-                const data = XLSX.utils.sheet_to_json(ws, { raw: false });
+
+                // Get current rule to know what headers to look for
+                const rule = RECON_RULES[reconPaymentMethod] || RECON_RULES['一般信用卡'];
+                const allPossibleHeaders = [...rule.dateFields, ...rule.amountFields, ...rule.idFields];
+
+                // Improved header detection for reports with leading metadata rows (like Easy Wallet)
+                let data: any[] = [];
+                const fullData = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                let headerIndex = 0;
+
+                // Search for the first row that contains at least one of our key headers
+                for (let i = 0; i < Math.min(fullData.length, 20); i++) {
+                    const row: any = fullData[i];
+                    if (Array.isArray(row) && row.some(cell => typeof cell === 'string' && allPossibleHeaders.some(h => String(cell).includes(h)))) {
+                        headerIndex = i;
+                        break;
+                    }
+                }
+
+                data = XLSX.utils.sheet_to_json(ws, { raw: false, range: headerIndex });
 
                 if (!data || data.length === 0) {
                     alert('讀取失敗：檔案內容為空或無法解析');
@@ -1200,6 +1226,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                     <option value="掃碼-全支付">掃碼-全支付</option>
                                     <option value="掃碼-街口支付">掃碼-街口支付</option>
                                     <option value="掃碼-LINE Pay">掃碼-LINE Pay</option>
+                                    <option value="掃碼-悠遊付">掃碼-悠遊付</option>
                                 </select>
                                 <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm font-medium cursor-pointer hover:bg-blue-700 transition-colors">
                                     <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handlePlatformUpload} />
