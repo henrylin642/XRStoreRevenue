@@ -651,13 +651,8 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
             const isSalesReturn = sys.invoiceNumber && refundSet.has(sys.invoiceNumber);
             const sysWithMeta = { ...sys, isSalesReturn };
 
-            if (isSalesReturn) {
-                matches.push({
-                    system: sysWithMeta,
-                    status: 'missing_platform'
-                });
-                return;
-            }
+            // Note: We no longer return early here for sales returns.
+            // We allow them to go through the matching logic below.
 
             const sysTime = new Date(sys.date).getTime();
             let bestMatchIdx = -1;
