@@ -8,7 +8,8 @@ import {
 import { Transaction } from '@/lib/data-manager';
 import {
     CloudRain, CreditCard, Ticket, DollarSign, Calendar, TrendingUp, AlertTriangle, CheckCircle, Users,
-    Thermometer, Sun, Cloud, CloudSnow, CloudLightning, FileText, Smartphone as SmartphoneIcon
+    Thermometer, Sun, Cloud, CloudSnow, CloudLightning, FileText, Smartphone as SmartphoneIcon,
+    Info, Trash2, X
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getVisitorStats, getDailyVisitorStats } from '@/lib/visitor-data';
@@ -504,6 +505,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
     const [isMatching, setIsMatching] = useState(false);
     const [reconStartDate, setReconStartDate] = useState('2026-01-01');
     const [reconEndDate, setReconEndDate] = useState('2026-01-31');
+    const [inspectedRow, setInspectedRow] = useState<any | null>(null);
 
     const handlePlatformUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
@@ -525,29 +527,42 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                 // Map platform data to a standard format
                 const parsed = data.map((row: any) => {
                     // Try various common column names for time, amount, and ID
-                    const dateRaw = row['訂單交易日期'] || row['支付日期'] || row['交易時間'] || row['交易日期'] || row['Date'] || row['時間'] || row['訂單日期'] || row['交易時間(台北時間)'];
+                    // Newebpay often separates Date and Time columns in some exports
+                    const rawDate = row['訂單交易日期'] || row['支付日期'] || row['交易日期'] || row['Date'] || row['日期'] || row['訂單日期'];
+                    const rawTime = row['交易時間'] || row['時間'] || row['Time'] || '00:00:00';
                     const amount = Number(row['主支付金額'] || row['特店支付金額'] || row['主支付數值(金額)'] || row['交易金額'] || row['金額'] || row['Amount'] || row['金額(TWD)'] || 0);
                     const txId = row['特店訂單編號'] || row['藍新金流訂單編號'] || row['訂單編號'] || row['交易編號'] || row['Transaction ID'] || row['序號'] || row['藍新序號'] || row['平台單號'] || '-';
                     const status = String(row['訂單交易狀態'] || row['交易狀態'] || row['Status'] || row['交易回覆訊息'] || '已付款').trim();
 
                     let dateStr = '';
-                    if (dateRaw) {
-                        if (typeof dateRaw === 'number') {
-                            // Handle Excel serial date (Number of days since 1899-12-30)
-                            const date = new Date(Math.round((dateRaw - 25569) * 864e5));
-                            dateStr = date.toISOString();
+                    if (rawDate) {
+                        let combinedDate: Date | null = null;
+
+                        if (typeof rawDate === 'number') {
+                            // Excel serial date (e.g. 46022.583)
+                            // XLSX parses this automatically usually, but let's be safe.
+                            // If it's a number, it's days since 1899-12-30.
+                            combinedDate = new Date(Math.round((rawDate - 25569) * 864e5));
                         } else {
-                            const d = new Date(dateRaw);
-                            if (!isNaN(d.getTime())) {
-                                // If it's a valid date, use it. But beware of timezone shifts if it's just '2026/01/01'
-                                // We want it to stay in local time as much as possible for comparison
-                                dateStr = d.toISOString();
-                            } else if (typeof dateRaw === 'string') {
-                                // Try common format: 2026/01/16 12:34:56
-                                const cleaned = dateRaw.replace(/\//g, '-');
-                                const d2 = new Date(cleaned);
-                                if (!isNaN(d2.getTime())) dateStr = d2.toISOString();
+                            // String handling. Lock to Taipei by appending +08:00 if it's a simple local format
+                            let fullStr = String(rawDate).trim();
+                            if (rawTime && !fullStr.includes(':')) {
+                                fullStr += ' ' + String(rawTime).trim();
                             }
+
+                            // Replace / with - for standard parsing
+                            const standardized = fullStr.replace(/\//g, '-');
+
+                            // If the string doesn't have a timezone indicator, assume Asia/Taipei
+                            if (!standardized.includes('+') && !standardized.includes('Z')) {
+                                combinedDate = new Date(standardized + ' +0800');
+                            } else {
+                                combinedDate = new Date(standardized);
+                            }
+                        }
+
+                        if (combinedDate && !isNaN(combinedDate.getTime())) {
+                            dateStr = combinedDate.toISOString();
                         }
                     }
 
@@ -562,15 +577,12 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     // Critical: Filter for paid status and valid date
                     if (r.date === '' || isNaN(r.amount)) return false;
 
-                    // Comprehensive whitelist of "Paid" statuses
                     const paidStatuses = [
                         '已付款', '付款成功', '成功', 'Success', 'Paid',
                         'SUCCESS', 'SUCCESS_PAY', 'AUTHORIZE_SUCCESS', '授權成功'
                     ];
 
                     if (r.status && !paidStatuses.some(s => r.status.includes(s))) return false;
-
-                    // Final sanity check: if amount is 0, it shouldn't be matched unless it's a specific type
                     if (r.amount === 0) return false;
 
                     return true;
@@ -1091,6 +1103,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                             <th className="px-4 py-2 font-medium">交易時間</th>
                                             <th className="px-4 py-2 font-medium">平台序號</th>
                                             <th className="px-4 py-2 font-medium text-right">金額</th>
+                                            <th className="px-4 py-2 text-center w-10">-</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -1137,6 +1150,17 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                                     <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
                                                         {plat ? `$${plat.amount.toLocaleString()}` : '-'}
                                                     </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        {plat && (
+                                                            <button
+                                                                onClick={() => setInspectedRow(plat.raw)}
+                                                                className="p-1 hover:bg-slate-200 rounded-md transition-colors text-slate-400 hover:text-blue-600"
+                                                                title="查看原始數據"
+                                                            >
+                                                                <Info className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </td>
                                                 </tr>
                                             );
                                         })}
@@ -1148,11 +1172,53 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                         {platformData.length > 0 && (
                             <div className="mt-4 flex justify-end">
                                 <button
-                                    onClick={() => setPlatformData([])}
-                                    className="text-xs text-slate-400 hover:text-red-500 underline transition-colors"
+                                    onClick={() => {
+                                        setPlatformData([]);
+                                        setIsMatching(false);
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-red-600 font-medium transition-colors"
                                 >
-                                    清除並重新上傳
+                                    <Trash2 className="w-4 h-4" />
+                                    <span>清除並重新上傳</span>
                                 </button>
+                            </div>
+                        )}
+
+                        {/* Raw Data Inspector Modal */}
+                        {inspectedRow && (
+                            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+                                    <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                            <Info className="w-5 h-5 text-blue-500" />
+                                            原始數據檢查器 (Platform Row Data)
+                                        </h3>
+                                        <button
+                                            onClick={() => setInspectedRow(null)}
+                                            className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+                                        >
+                                            <X className="w-5 h-5 text-slate-500" />
+                                        </button>
+                                    </div>
+                                    <div className="p-6 overflow-y-auto">
+                                        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                                            {Object.entries(inspectedRow).map(([key, val]) => (
+                                                <div key={key} className="border-b border-slate-50 pb-2">
+                                                    <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">{key}</span>
+                                                    <span className="text-sm text-slate-700 font-mono break-all">{String(val)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                                        <button
+                                            onClick={() => setInspectedRow(null)}
+                                            className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg"
+                                        >
+                                            關閉
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
