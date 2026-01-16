@@ -508,35 +508,57 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
         const file = e.target.files[0];
         const reader = new FileReader();
         reader.onload = (event) => {
-            const bstr = event.target?.result;
-            const wb = XLSX.read(bstr, { type: 'binary' });
-            const wsname = wb.SheetNames[0];
-            const ws = wb.Sheets[wsname];
-            const data = XLSX.utils.sheet_to_json(ws);
+            try {
+                const dataRaw = event.target?.result;
+                const wb = XLSX.read(dataRaw, { type: 'array' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const data = XLSX.utils.sheet_to_json(ws);
 
-            // Map platform data to a standard format
-            const parsed = data.map((row: any) => {
-                const dateRaw = row['交易時間'] || row['交易日期'] || row['Date'] || row['時間'];
-                const amount = Number(row['交易金額'] || row['金額'] || row['Amount'] || 0);
-                const txId = row['訂單編號'] || row['交易編號'] || row['Transaction ID'] || row['序號'] || '-';
-
-                let dateStr = '';
-                if (dateRaw) {
-                    const d = new Date(dateRaw);
-                    if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                if (!data || data.length === 0) {
+                    alert('讀取失敗：檔案內容為空或無法解析');
+                    return;
                 }
 
-                return {
-                    date: dateStr,
-                    amount,
-                    txId,
-                    raw: row
-                };
-            }).filter(r => r.date !== '');
+                // Map platform data to a standard format
+                const parsed = data.map((row: any) => {
+                    // Try various common column names for time, amount, and ID
+                    const dateRaw = row['交易時間'] || row['交易日期'] || row['Date'] || row['時間'] || row['訂單日期'] || row['交易時間(台北時間)'];
+                    const amount = Number(row['交易金額'] || row['金額'] || row['Amount'] || row['金額(TWD)'] || 0);
+                    const txId = row['訂單編號'] || row['交易編號'] || row['Transaction ID'] || row['序號'] || row['藍新序號'] || row['平台單號'] || '-';
 
-            setPlatformData(parsed);
+                    let dateStr = '';
+                    if (dateRaw) {
+                        const d = new Date(dateRaw);
+                        if (!isNaN(d.getTime())) {
+                            dateStr = d.toISOString();
+                        } else if (typeof dateRaw === 'string') {
+                            // Try common format: 2026/01/16 12:34:56
+                            const cleaned = dateRaw.replace(/\//g, '-');
+                            const d2 = new Date(cleaned);
+                            if (!isNaN(d2.getTime())) dateStr = d2.toISOString();
+                        }
+                    }
+
+                    return {
+                        date: dateStr,
+                        amount,
+                        txId,
+                        raw: row
+                    };
+                }).filter(r => r.date !== '');
+
+                if (parsed.length === 0) {
+                    alert('讀取失敗：找不到有效的日期資料，請檢查表格標題。');
+                } else {
+                    setPlatformData(parsed);
+                }
+            } catch (err) {
+                console.error('Platform upload error:', err);
+                alert('上傳失敗：檔案格式錯誤或系統無法辨識此 CSV/Excel 內容');
+            }
         };
-        reader.readAsBinaryString(file);
+        reader.readAsArrayBuffer(file);
     };
 
     const reconciliationMatches = useMemo(() => {
