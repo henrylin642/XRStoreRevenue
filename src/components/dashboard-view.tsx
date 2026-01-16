@@ -1254,7 +1254,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                     <option value="電子票證-悠遊卡-小額">電子票證-悠遊卡-小額</option>
                                 </select>
                                 <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm font-medium cursor-pointer hover:bg-blue-700 transition-colors">
-                                    <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handlePlatformUpload} />
+                                    <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handlePlatformUpload} />
                                     <CloudRain className="w-4 h-4" />
                                     <span>上傳平台數據</span>
                                 </label>
