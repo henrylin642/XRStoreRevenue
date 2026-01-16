@@ -642,6 +642,18 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
 
         // 3. Try to match each system record
         systemRecords.forEach(sys => {
+            // Check for sales return
+            const isSalesReturn = sys.invoiceNumber && refundSet.has(sys.invoiceNumber);
+            const sysWithMeta = { ...sys, isSalesReturn };
+
+            if (isSalesReturn) {
+                matches.push({
+                    system: sysWithMeta,
+                    status: 'missing_platform'
+                });
+                return;
+            }
+
             const sysTime = new Date(sys.date).getTime();
             let bestMatchIdx = -1;
             let minDiff = 60 * 1000; // 60 seconds tolerance
@@ -661,13 +673,13 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
             if (bestMatchIdx !== -1) {
                 matchedPlatformIndices.add(bestMatchIdx);
                 matches.push({
-                    system: sys,
+                    system: sysWithMeta,
                     platform: filteredPlatformData[bestMatchIdx],
                     status: 'matched'
                 });
             } else {
                 matches.push({
-                    system: sys,
+                    system: sysWithMeta,
                     status: 'missing_platform'
                 });
             }
@@ -1105,14 +1117,15 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                 <table className="w-full text-sm text-left border-collapse">
                                     <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-xs">
                                         <tr>
-                                            <th className="px-4 py-3 border-r border-slate-200 bg-slate-100/50" colSpan={3}>系統發票紀錄 (左)</th>
+                                            <th className="px-4 py-3 border-r border-slate-200 bg-slate-100/50" colSpan={4}>系統發票紀錄 (左)</th>
                                             <th className="px-4 py-3 text-center border-r border-slate-200 w-24">對帳狀態</th>
                                             <th className="px-4 py-3 bg-slate-100/50" colSpan={3}>平台交易數據 (右)</th>
                                         </tr>
                                         <tr className="bg-slate-50/80 border-b border-slate-200">
                                             <th className="px-4 py-2 font-medium">交易時間</th>
                                             <th className="px-4 py-2 font-medium">發票號碼</th>
-                                            <th className="px-4 py-2 font-medium text-right border-r border-slate-200">金額</th>
+                                            <th className="px-4 py-2 font-medium text-right">金額</th>
+                                            <th className="px-4 py-2 font-medium border-r border-slate-200">備註</th>
                                             <th className="px-4 py-2 text-center border-r border-slate-200">-</th>
                                             <th className="px-4 py-2 font-medium">交易時間</th>
                                             <th className="px-4 py-2 font-medium">平台序號</th>
@@ -1129,14 +1142,17 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                             return (
                                                 <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${!isMatched ? 'bg-red-50/30' : ''}`}>
                                                     {/* System Info */}
-                                                    <td className={`px-4 py-3 text-xs ${!sys ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                                    <td className={`px-4 py-3 text-xs ${(!sys || sys.isSalesReturn) ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
                                                         {sys ? formatDateInTaipei(sys.date) : '缺失記錄'}
                                                     </td>
-                                                    <td className={`px-4 py-3 font-mono ${!sys ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                    <td className={`px-4 py-3 font-mono ${(!sys || sys.isSalesReturn) ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
                                                         {sys?.invoiceNumber || '無發票'}
                                                     </td>
-                                                    <td className={`px-4 py-3 text-right font-mono font-medium border-r border-slate-200 ${!sys ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${(!sys || sys.isSalesReturn) ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
                                                         {sys ? `$${sys.amount.toLocaleString()}` : '-'}
+                                                    </td>
+                                                    <td className={`px-4 py-3 border-r border-slate-200 text-xs ${sys?.isSalesReturn ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
+                                                        {sys?.isSalesReturn ? '銷退' : ''}
                                                     </td>
 
                                                     {/* Status Icon */}
