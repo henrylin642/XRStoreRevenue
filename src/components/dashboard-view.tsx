@@ -9,7 +9,7 @@ import { Transaction } from '@/lib/data-manager';
 import {
     CloudRain, CreditCard, Ticket, DollarSign, Calendar, TrendingUp, AlertTriangle, CheckCircle, Users,
     Thermometer, Sun, Cloud, CloudSnow, CloudLightning, FileText, Smartphone as SmartphoneIcon,
-    Info, Trash2, X, Printer, LogOut
+    Info, Trash2, X, Printer, LogOut, Save
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getVisitorStats, getDailyVisitorStats } from '@/lib/visitor-data';
@@ -503,6 +503,27 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     const [weatherData, setWeatherData] = useState<Record<string, { min: number, max: number, code: number }>>({});
     const [remarks, setRemarks] = useState<Record<string, string>>({});
     const [dailyVisitorStats, setDailyVisitorStats] = useState<Record<string, number>>({});
+    const [savingVisitors, setSavingVisitors] = useState(false);
+
+    const handleSaveVisitorStats = async () => {
+        setSavingVisitors(true);
+        try {
+            // Save all rows in the current ops2026Data from the state
+            const entries = Object.entries(dailyVisitorStats);
+            for (const [dateStr, count] of entries) {
+                // Only save if it's within the currently displayed month to avoid bulk overhead
+                if (dateStr.startsWith(`2026-${String(ops2026Month).padStart(2, '0')}`)) {
+                    await updateDailyVisitorCount(dateStr, count);
+                }
+            }
+            alert('體驗人次數據已成功儲存至資料庫！');
+        } catch (e) {
+            console.error(e);
+            alert('儲存失敗，請檢查網路連線或聯繫管理員。');
+        } finally {
+            setSavingVisitors(false);
+        }
+    };
 
     // Reconciliation State
     const [platformData, setPlatformData] = useState<any[]>([]);
@@ -1280,14 +1301,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
                         <button
                             onClick={async () => {
-                                // Dynamic import or similar to call server action
                                 const { logout } = await import('@/app/login/actions');
                                 await logout();
                             }}
-                            className="p-2 bg-slate-100 text-slate-500 hover:text-red-500 rounded-lg transition-colors"
-                            title="登出"
+                            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-500 hover:text-red-500 hover:border-red-100 rounded-lg transition-all shadow-sm group"
+                            title="登出系統"
                         >
-                            <LogOut className="w-5 h-5" />
+                            <LogOut className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                            <span className="text-sm font-bold">登出系統</span>
                         </button>
                     </div>
                 </div>
@@ -1336,6 +1357,18 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                         {tab.label}
                     </button>
                 ))}
+
+                {/* Mobile/Ops friendly Logout Button in Tabs */}
+                <button
+                    onClick={async () => {
+                        const { logout } = await import('@/app/login/actions');
+                        await logout();
+                    }}
+                    className="py-3 px-6 font-medium text-sm flex items-center transition-colors text-slate-400 hover:text-red-500 hover:bg-red-50 ml-auto border-l border-slate-100"
+                >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    登出系統
+                </button>
             </div>
 
             {/* Overview Tab */}
@@ -1980,8 +2013,24 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     <div className="space-y-6 animate-in fade-in duration-500">
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                             <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-lg font-bold text-slate-800">2026年 每日營收報表</h3>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-4">
+                                    <h3 className="text-lg font-bold text-slate-800">2026年 每日營收報表</h3>
+                                    {role !== 'ops' && (
+                                        <span className="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded">唯讀模式 (唯 Ops 可存儲)</span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={handleSaveVisitorStats}
+                                        disabled={savingVisitors}
+                                        className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
+                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
+                                            }`}
+                                    >
+                                        <Save className="w-4 h-4" />
+                                        <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
+                                    </button>
                                     <select
                                         className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
                                         value={ops2026Month}
@@ -2137,12 +2186,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                             const val = parseInt(e.target.value) || 0;
                                                             setDailyVisitorStats(prev => ({ ...prev, [row.dateStr]: val }));
                                                         }}
-                                                        onBlur={(e) => {
-                                                            const val = parseInt(e.target.value) || 0;
-                                                            updateDailyVisitorCount(row.dateStr, val);
-                                                        }}
                                                         placeholder="0"
-                                                        className="w-20 text-right bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-700 transition-colors placeholder:text-slate-200"
+                                                        className="w-20 text-right bg-slate-50 border-b border-slate-200 hover:border-blue-500 focus:border-blue-600 focus:outline-none text-sm text-slate-700 transition-colors placeholder:text-slate-200 rounded px-1"
                                                     />
                                                 </td>
                                                 <td className="px-4 py-3">
