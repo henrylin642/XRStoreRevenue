@@ -553,10 +553,11 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
         reader.onload = (event) => {
             try {
                 const dataRaw = event.target?.result;
-                const wb = XLSX.read(dataRaw, { type: 'array' });
+                const wb = XLSX.read(dataRaw, { type: 'array', cellDates: true });
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
-                const data = XLSX.utils.sheet_to_json(ws);
+                // Use raw: false to get formatted strings from cells, which helps with date formats
+                const data = XLSX.utils.sheet_to_json(ws, { raw: false });
 
                 if (!data || data.length === 0) {
                     alert('讀取失敗：檔案內容為空或無法解析');
@@ -598,27 +599,25 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     if (rawDate) {
                         let combinedDate: Date | null = null;
 
-                        if (typeof rawDate === 'number') {
-                            // Excel serial date (e.g. 46022.583)
-                            // XLSX parses this automatically usually, but let's be safe.
-                            // If it's a number, it's days since 1899-12-30.
+                        // Check if it's already a Date object
+                        if (rawDate instanceof Date) {
+                            combinedDate = rawDate;
+                        } else if (typeof rawDate === 'number') {
                             combinedDate = new Date(Math.round((rawDate - 25569) * 864e5));
                         } else {
-                            // String handling. Lock to Taipei by appending +08:00 if it's a simple local format
                             let fullStr = String(rawDate).trim();
-                            // If it's a date only, and we have a time, combine them
                             if (rawTime && !fullStr.includes(':')) {
                                 fullStr += ' ' + String(rawTime).trim();
                             }
 
-                            // PXPay format 2026/01/10 12:07:29
-                            const standardized = fullStr.replace(/\//g, '-');
+                            // Remove any existing timezone suffix to force +0800
+                            const cleanDateStr = fullStr.replace(/\s*[+-]\d{4}$/, '').replace(/Z$/, '').replace(/\//g, '-');
 
-                            // If the string doesn't have a timezone indicator, assume Asia/Taipei
-                            if (!standardized.includes('+') && !standardized.includes('Z')) {
-                                combinedDate = new Date(standardized + ' +0800');
+                            // If no timezone, force +0800
+                            if (!cleanDateStr.includes('+') && !cleanDateStr.includes('Z')) {
+                                combinedDate = new Date(cleanDateStr + ' +0800');
                             } else {
-                                combinedDate = new Date(standardized);
+                                combinedDate = new Date(cleanDateStr);
                             }
                         }
 
@@ -633,16 +632,13 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                         txId,
                         status,
                         raw: cleanRow,
-                        ruleUsed: rule // for debugging
+                        ruleUsed: rule
                     };
-                }).filter(r => {
-                    // Critical: Filter for paid status and valid date
+                }).filter((r: any) => {
                     if (r.date === '' || isNaN(r.amount)) return false;
-
                     const rule = RECON_RULES[reconPaymentMethod] || RECON_RULES['一般信用卡'];
-                    if (r.status && !rule.successStatuses.some(s => r.status.includes(s))) return false;
+                    if (r.status && !rule.successStatuses.some((s: string) => r.status.includes(s))) return false;
                     if (r.amount === 0) return false;
-
                     return true;
                 });
 
