@@ -1191,6 +1191,19 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                 <button
                                     onClick={() => {
                                         const now = new Date();
+                                        const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                                        const lastDayThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                                        const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                        setReconStartDate(formatDate(firstDayThisMonth));
+                                        setReconEndDate(formatDate(lastDayThisMonth));
+                                    }}
+                                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-colors border border-blue-100"
+                                >
+                                    本月
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const now = new Date();
                                         const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
                                         const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
                                         const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
