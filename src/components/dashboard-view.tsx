@@ -561,7 +561,17 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
         reader.onload = (event) => {
             try {
                 const dataRaw = event.target?.result;
-                const wb = XLSX.read(dataRaw, { type: 'array', cellDates: true });
+                let wb;
+
+                // If it's a CSV, try to decode as UTF-8 first to avoid encoding issues
+                if (file.name.toLowerCase().endsWith('.csv') && dataRaw instanceof ArrayBuffer) {
+                    const decoder = new TextDecoder('utf-8');
+                    const csvContent = decoder.decode(dataRaw);
+                    wb = XLSX.read(csvContent, { type: 'string', cellDates: true });
+                } else {
+                    wb = XLSX.read(dataRaw, { type: 'array', cellDates: true });
+                }
+
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
                 // Use raw: false to get formatted strings from cells, which helps with date formats
@@ -577,6 +587,8 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     // Pre-process row values: strip =" and " common in CSV exports for Excel
                     const cleanRow: any = {};
                     Object.entries(row).forEach(([k, v]) => {
+                        // Strip non-printable characters and extra whitespace from key
+                        const cleanKey = k.replace(/[^\x20-\x7E\s\u4E00-\u9FFF]/g, '').trim();
                         let val = v;
                         if (typeof v === 'string') {
                             if (v.startsWith('="') && v.endsWith('"')) {
@@ -585,7 +597,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                 val = v.substring(1, v.length - 1);
                             }
                         }
-                        cleanRow[k] = val;
+                        cleanRow[cleanKey] = val;
                     });
 
                     // 1. Get current rule
@@ -657,7 +669,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                 });
 
                 if (parsed.length === 0) {
-                    alert('讀取失敗：找不到有效的日期資料或已付款記錄，請檢查表格內容與標題。');
+                    alert(`讀取失敗：找不到有效的日期資料或已付款記錄。\n\n目前選擇的對帳方式是：【${reconPaymentMethod}】\n請確認您的上傳報表是否與此方式一致。`);
                 } else {
                     setPlatformData(parsed);
                 }
