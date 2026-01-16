@@ -5,11 +5,11 @@ const SECRET_KEY = process.env.JWT_SECRET || 'your-secret-key-change-this-in-pro
 const key = new TextEncoder().encode(SECRET_KEY);
 
 export async function encrypt(payload: any) {
-  return await new SignJWT(payload)
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('24h')
-    .sign(key);
+    return await new SignJWT(payload)
+        .setProtectedHeader({ alg: 'HS256' })
+        .setIssuedAt()
+        .setExpirationTime('24h')
+        .sign(key);
 }
 
 export async function decrypt(input: string): Promise<any> {
@@ -23,9 +23,9 @@ export async function decrypt(input: string): Promise<any> {
     }
 }
 
-export async function createSession(username: string) {
+export async function createSession(username: string, role: string) {
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const session = await encrypt({ username, expires });
+    const session = await encrypt({ username, role, expires });
 
     (await cookies()).set('session', session, { expires, httpOnly: true });
 }
