@@ -671,6 +671,45 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
 
                 return { date: dateStr, amount, txId, status };
             }
+        },
+        '電子票證-一卡通-小額': {
+            dateFields: ['交易時間', '日期'],
+            timeFields: [],
+            amountFields: ['交易金額', '有效金額', '金額'],
+            idFields: ['交易序號', '卡號', '端末機代號'],
+            statusFields: ['交易類型', '狀態'],
+            successStatuses: ['消費', '成功', 'SUCCESS', 'Paid'],
+            mapRow: (row, rule) => {
+                const findVal = (fields: string[]) => {
+                    for (const f of fields) if (row[f] !== undefined) return row[f];
+                    return null;
+                };
+                const amount = Number(findVal(rule.amountFields) || 0);
+                const txId = String(findVal(rule.idFields) || '-');
+                const status = String(findVal(rule.statusFields) || '消費').trim();
+
+                let dateStr = '';
+                const rawDate = findVal(rule.dateFields);
+                if (rawDate) {
+                    if (typeof rawDate === 'number') {
+                        try {
+                            const date = XLSX.SSF.parse_date_code(rawDate);
+                            const ds = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')} ${String(date.H).padStart(2, '0')}:${String(date.M).padStart(2, '0')}:${String(date.S).padStart(2, '0')}`;
+                            const d = new Date(ds + ' +08:00');
+                            if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        } catch (e) {
+                            const d = new Date(Math.round((rawDate - 25569) * 864e5));
+                            if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        }
+                    } else {
+                        const clean = String(rawDate).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\//g, '-');
+                        const d = new Date(clean + ' +08:00');
+                        if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                    }
+                }
+
+                return { date: dateStr, amount, txId, status };
+            }
         }
     };
 
@@ -1385,6 +1424,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                     <option value="掃碼-LINE Pay">掃碼-LINE Pay</option>
                                     <option value="掃碼-悠遊付">掃碼-悠遊付</option>
                                     <option value="電子票證-悠遊卡-小額">電子票證-悠遊卡-小額</option>
+                                    <option value="電子票證-一卡通-小額">電子票證-一卡通-小額</option>
                                 </select>
                                 <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm font-medium cursor-pointer hover:bg-blue-700 transition-colors">
                                     <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handlePlatformUpload} />
