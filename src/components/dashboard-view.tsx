@@ -172,11 +172,29 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
             trendData = Object.values(monthlyMap).sort((a, b) => a.date.localeCompare(b.date));
         }
 
-        // Add ATV to trendData
-        trendData = trendData.map(d => ({
-            ...d,
-            atv: d.count > 0 ? Math.round(d.revenue / d.count) : 0
-        }));
+        // Add ATV, Highlight, and Cumulative to trendData
+        let cumulativeRevenue = 0;
+        trendData = trendData.map(d => {
+            cumulativeRevenue += d.revenue;
+
+            // Highlight if Weekend or Holiday
+            let isHighlight = false;
+            if (granularity === 'day') {
+                const dateObj = new Date(d.date);
+                const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+                const isHoliday = !!getDailyRemark(d.date);
+                isHighlight = isWeekend || isHoliday;
+            }
+
+            return {
+                ...d,
+                atv: d.count > 0 ? Math.round(d.revenue / d.count) : 0,
+                isHighlight,
+                cumulativeRevenue
+            };
+        });
+
+        const totalActualCumulative = trendData.length > 0 ? trendData[trendData.length - 1].cumulativeRevenue : 0;
 
         // Hourly (unchanged)
         const hourlyMap: Record<number, number> = {};
@@ -189,7 +207,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
         });
         const hourlyData = Object.entries(hourlyMap).map(([h, v]) => ({ hour: `${h}:00`, revenue: v }));
 
-        return { totalRevenue, totalTx, avgTicket, paymentMethods, dailyData, trendData, hourlyData };
+        return { totalRevenue, totalTx, avgTicket, paymentMethods, dailyData, trendData, hourlyData, totalActualCumulative };
     }, [validTransactions, selectedYear, selectedMonth, granularity]);
 
     // Growth Analysis (MoM, YoY)
@@ -443,6 +461,37 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
         });
     }, [pivotData, target2026]);
 
+    const receivableTarget = useMemo(() => {
+        if (selectedYear !== '2026') return 0;
+
+        let target = 0;
+        if (selectedMonth === 'All') {
+            target = target2026;
+            // Approximate target for current progress in the year
+            const today = new Date();
+            if (today.getFullYear() === 2026) {
+                const startOfYear = new Date(2026, 0, 1);
+                const diffTime = Math.abs(today.getTime() - startOfYear.getTime());
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                target = (target2026 / 365) * diffDays;
+            }
+        } else {
+            const m = parseInt(selectedMonth);
+            const row = yearPivotData.find(r => r.month === m);
+            if (row) {
+                target = row.target2026;
+                // If current month, split by days
+                const today = new Date();
+                if (today.getFullYear() === 2026 && (today.getMonth() + 1) === m) {
+                    const daysInMonth = new Date(2026, m, 0).getDate();
+                    target = (target / daysInMonth) * today.getDate();
+                }
+            }
+        }
+        return Math.round(target);
+    }, [selectedYear, selectedMonth, target2026, yearPivotData]);
+
+
     // 2026 Operations Tab Logic (Moved here to depend on pivotData & target2026)
     const [ops2026Month, setOps2026Month] = useState<number>(new Date().getFullYear() === 2026 ? new Date().getMonth() + 1 : 1);
     const [weatherData, setWeatherData] = useState<Record<string, { min: number, max: number, code: number }>>({});
@@ -671,16 +720,22 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     sub={`共 ${stats.totalTx.toLocaleString()} 筆交易`}
                     icon={<DollarSign className="w-8 h-8 text-green-500 opacity-80" />} trend="up" />
 
+                <Card title="累計應收 (預計)"
+                    value={`$${receivableTarget.toLocaleString()}`}
+                    sub={`${selectedYear === '2026' ? '2026 年度/月度進度目標' : '僅 2026 提供進度追蹤'}`}
+                    icon={<FileText className="w-8 h-8 text-orange-500 opacity-80" />} />
+
+                <Card title="累計實收"
+                    value={`$${stats.totalActualCumulative.toLocaleString()}`}
+                    sub={`達成率: ${receivableTarget > 0 ? ((stats.totalActualCumulative / receivableTarget) * 100).toFixed(1) : 0}%`}
+                    icon={<CheckCircle className="w-8 h-8 text-blue-500 opacity-80" />} />
+
                 <Card title="平均客單價 (ATV)"
                     value={`$${Math.round(stats.avgTicket).toLocaleString()}`}
                     sub="每筆訂單平均"
-                    icon={<CreditCard className="w-8 h-8 text-blue-500 opacity-80" />} trend="neutral" />
-
-                <Card title="最高單日營收"
-                    value={`$${Math.max(...stats.dailyData.map(d => d.revenue), 0).toLocaleString()}`}
-                    sub={stats.dailyData.slice().sort((a, b) => b.revenue - a.revenue)[0]?.date || '-'}
-                    icon={<TrendingUp className="w-8 h-8 text-purple-500 opacity-80" />} trend="up" />
+                    icon={<CreditCard className="w-8 h-8 text-purple-500 opacity-80" />} trend="neutral" />
             </div>
+
 
             <div className="flex space-x-1 mb-6 border-b border-slate-200 overflow-x-auto">
                 {[
@@ -756,7 +811,11 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                             labelFormatter={(label) => `時間: ${label}`}
                                         />
                                         <Legend />
-                                        <Bar yAxisId="left" dataKey="revenue" fill="#3b82f6" name="營收" radius={[4, 4, 0, 0]} barSize={20} />
+                                        <Bar yAxisId="left" dataKey="revenue" name="營收" radius={[4, 4, 0, 0]} barSize={20}>
+                                            {stats.trendData.map((entry: any, index: number) => (
+                                                <Cell key={`cell-${index}`} fill={entry.isHighlight ? '#ef4444' : '#3b82f6'} />
+                                            ))}
+                                        </Bar>
                                         <Line yAxisId="right" type="monotone" dataKey="atv" stroke="#ff7300" name="平均客單價" strokeWidth={2} dot={{ r: 3 }} />
                                     </ComposedChart>
                                 </ResponsiveContainer>
