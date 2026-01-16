@@ -20,6 +20,26 @@ interface DashboardViewProps {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
 
+// Helper to format date in Taipei time
+const formatDateInTaipei = (dateStr: string, includeTime = true) => {
+    if (!dateStr) return '-';
+    try {
+        const date = new Date(dateStr);
+        return new Intl.DateTimeFormat('zh-TW', {
+            timeZone: 'Asia/Taipei',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: includeTime ? '2-digit' : undefined,
+            minute: includeTime ? '2-digit' : undefined,
+            second: includeTime ? '2-digit' : undefined,
+            hour12: false
+        }).format(date).replace(/\//g, '-');
+    } catch (e) {
+        return dateStr;
+    }
+};
+
 export default function DashboardView({ transactions }: DashboardViewProps) {
     const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2026' | 'visitor_stats'>('overview');
     const [selectedYear, setSelectedYear] = useState<string>('All');
@@ -29,13 +49,31 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
     const parsedData = useMemo(() => {
         return transactions.map(t => {
             const d = new Date(t.date);
+            // Use Intl.DateTimeFormat to get parts in Taipei timezone
+            const formatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Asia/Taipei',
+                year: 'numeric',
+                month: 'numeric',
+                day: 'numeric',
+                hour: 'numeric',
+                hour12: false
+            });
+
+            const parts = formatter.formatToParts(d);
+            const getPart = (type: string) => parts.find(p => p.type === type)?.value;
+
+            const year = parseInt(getPart('year') || '0');
+            const month = parseInt(getPart('month') || '0');
+            const day = parseInt(getPart('day') || '0');
+            const hour = parseInt(getPart('hour') || '0');
+
             return {
                 ...t,
-                year: d.getFullYear(),
-                month: d.getMonth() + 1,
-                day: d.getDate(),
-                hour: d.getHours(),
-                ym: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+                year,
+                month,
+                day,
+                hour,
+                ym: `${year}-${String(month).padStart(2, '0')}`
             };
         }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }, [transactions]);
@@ -1341,8 +1379,8 @@ function InvoiceTablePagination({ data, refundSet }: { data: any[], refundSet: S
                         <td className={`px-4 py-3 ${invoiceStyle} transition-colors`}>
                             {hasInvoice ? t.invoiceNumber : '無發票記錄'}
                         </td>
-                        <td className="px-4 py-3 text-slate-500">
-                            {t.date}
+                        <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                            {formatDateInTaipei(t.date)}
                         </td>
                         <td className={`px-4 py-3 text-right font-mono font-medium ${t.amount < 0 ? 'text-red-600' : 'text-slate-700'}`}>
                             ${t.amount.toLocaleString()}
