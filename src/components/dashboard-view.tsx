@@ -511,6 +511,33 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
     const [reconPaymentMethod, setReconPaymentMethod] = useState<string>('一般信用卡');
     const [inspectedRow, setInspectedRow] = useState<any | null>(null);
 
+    // Platform Reconciliation Rules Configuration
+    const RECON_RULES: Record<string, {
+        dateFields: string[],
+        timeFields: string[],
+        amountFields: string[],
+        idFields: string[],
+        statusFields: string[],
+        successStatuses: string[]
+    }> = {
+        '一般信用卡': {
+            dateFields: ['訂單交易日期', '支付日期', '交易日期', 'Date', '日期', '訂單日期'],
+            timeFields: ['交易時間(台北時間)', '交易時間', '時間', 'Time'],
+            amountFields: ['主支付金額', '特店支付金額', '主支付數值(金額)', '交易金額', '金額', 'Amount', '金額(TWD)'],
+            idFields: ['特店訂單編號', '藍新金流交易序號', '藍新金流訂單編號', '訂單編號', '交易編號', 'Transaction ID', '序號', '藍新序號', '平台單號'],
+            statusFields: ['訂單支付狀態', '主支付狀態', '訂單交易狀態', '交易狀態', 'Status', '交易回覆訊息'],
+            successStatuses: ['已付款', '付款成功', '成功', 'Success', 'Paid', 'SUCCESS', 'SUCCESS_PAY', 'AUTHORIZE_SUCCESS', '授權成功']
+        },
+        '掃碼-全支付': {
+            dateFields: ['交易時間', '日期'],
+            timeFields: ['時間'],
+            amountFields: ['支付金額', '交易金額', '金額'],
+            idFields: ['商戶交易編號', '訂單編號'],
+            statusFields: ['交易類型', '狀態'],
+            successStatuses: ['付款', '成功', 'SUCCESS', 'Paid']
+        }
+    };
+
     const handlePlatformUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
         const file = e.target.files[0];
@@ -544,12 +571,20 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                         cleanRow[k] = val;
                     });
 
-                    // Try various common column names for time, amount, and ID
-                    const rawDate = cleanRow['訂單交易日期'] || cleanRow['支付日期'] || cleanRow['交易日期'] || cleanRow['Date'] || cleanRow['日期'] || cleanRow['訂單日期'] || cleanRow['交易時間'];
-                    const rawTime = cleanRow['交易時間(台北時間)'] || cleanRow['交易時間'] || cleanRow['時間'] || cleanRow['Time'] || '00:00:00';
-                    const amount = Number(cleanRow['支付金額'] || cleanRow['主支付金額'] || cleanRow['特店支付金額'] || cleanRow['主支付數值(金額)'] || cleanRow['交易金額'] || cleanRow['金額'] || cleanRow['Amount'] || cleanRow['金額(TWD)'] || 0);
-                    const txId = cleanRow['商戶交易編號'] || cleanRow['特店訂單編號'] || cleanRow['藍新金流交易序號'] || cleanRow['藍新金流訂單編號'] || cleanRow['訂單編號'] || cleanRow['交易編號'] || cleanRow['Transaction ID'] || cleanRow['序號'] || cleanRow['藍新序號'] || cleanRow['平台單號'] || '-';
-                    const status = String(cleanRow['交易類型'] || cleanRow['訂單支付狀態'] || cleanRow['主支付狀態'] || cleanRow['訂單交易狀態'] || cleanRow['交易狀態'] || cleanRow['Status'] || cleanRow['交易回覆訊息'] || '已付款').trim();
+                    // 1. Get current rule
+                    const rule = RECON_RULES[reconPaymentMethod] || RECON_RULES['一般信用卡'];
+
+                    // 2. Map fields based on rule
+                    const findVal = (fields: string[]) => {
+                        for (const f of fields) if (cleanRow[f] !== undefined) return cleanRow[f];
+                        return null;
+                    };
+
+                    const rawDate = findVal(rule.dateFields);
+                    const rawTime = findVal(rule.timeFields) || '00:00:00';
+                    const amount = Number(findVal(rule.amountFields) || 0);
+                    const txId = String(findVal(rule.idFields) || '-');
+                    const status = String(findVal(rule.statusFields) || '已付款').trim();
 
                     let dateStr = '';
                     if (rawDate) {
@@ -589,19 +624,15 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                         amount,
                         txId,
                         status,
-                        raw: cleanRow
+                        raw: cleanRow,
+                        ruleUsed: rule // for debugging
                     };
                 }).filter(r => {
                     // Critical: Filter for paid status and valid date
                     if (r.date === '' || isNaN(r.amount)) return false;
 
-                    const paidStatuses = [
-                        '已付款', '付款成功', '成功', 'Success', 'Paid',
-                        'SUCCESS', 'SUCCESS_PAY', 'AUTHORIZE_SUCCESS', '授權成功',
-                        '付款' // PXPay status
-                    ];
-
-                    if (r.status && !paidStatuses.some(s => r.status.includes(s))) return false;
+                    const rule = RECON_RULES[reconPaymentMethod] || RECON_RULES['一般信用卡'];
+                    if (r.status && !rule.successStatuses.some(s => r.status.includes(s))) return false;
                     if (r.amount === 0) return false;
 
                     return true;
