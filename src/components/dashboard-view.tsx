@@ -559,6 +559,14 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
             idFields: ['悠遊付訂單編號', '商店訂單編號', '訂單編號'],
             statusFields: ['訂單狀態', '狀態'],
             successStatuses: ['已完成', '成功', 'SUCCESS', 'Paid']
+        },
+        '電子票證-悠遊卡-小額': {
+            dateFields: ['交易時間', '日期'],
+            timeFields: [],
+            amountFields: ['交易金額', '金額'],
+            idFields: ['RRN', '晶片號碼'],
+            statusFields: ['交易狀態'],
+            successStatuses: ['交易成功']
         }
     };
 
@@ -615,13 +623,16 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     Object.entries(row).forEach(([k, v]) => {
                         // Strip non-printable characters and extra whitespace from key
                         const cleanKey = k.replace(/[^\x20-\x7E\s\u4E00-\u9FFF]/g, '').trim();
-                        let val = v;
+                        let val: any = v;
                         if (typeof v === 'string') {
-                            if (v.startsWith('="') && v.endsWith('"')) {
-                                val = v.substring(2, v.length - 1);
-                            } else if (v.startsWith('"') && v.endsWith('"')) {
-                                val = v.substring(1, v.length - 1);
+                            let strVal = v;
+                            if (strVal.startsWith('="') && strVal.endsWith('"')) {
+                                strVal = strVal.substring(2, strVal.length - 1);
+                            } else if (strVal.startsWith('"') && strVal.endsWith('"')) {
+                                strVal = strVal.substring(1, strVal.length - 1);
                             }
+                            // Clean internal newlines and extra spaces (common in HTML-based Excel exports)
+                            val = strVal.replace(/\s+/g, ' ').trim();
                         }
                         cleanRow[cleanKey] = val;
                     });
@@ -1240,6 +1251,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                     <option value="掃碼-街口支付">掃碼-街口支付</option>
                                     <option value="掃碼-LINE Pay">掃碼-LINE Pay</option>
                                     <option value="掃碼-悠遊付">掃碼-悠遊付</option>
+                                    <option value="電子票證-悠遊卡-小額">電子票證-悠遊卡-小額</option>
                                 </select>
                                 <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm font-medium cursor-pointer hover:bg-blue-700 transition-colors">
                                     <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handlePlatformUpload} />
