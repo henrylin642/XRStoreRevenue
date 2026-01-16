@@ -9,7 +9,7 @@ import { Transaction } from '@/lib/data-manager';
 import {
     CloudRain, CreditCard, Ticket, DollarSign, Calendar, TrendingUp, AlertTriangle, CheckCircle, Users,
     Thermometer, Sun, Cloud, CloudSnow, CloudLightning, FileText, Smartphone as SmartphoneIcon,
-    Info, Trash2, X, Printer
+    Info, Trash2, X, Printer, LogOut
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getVisitorStats, getDailyVisitorStats } from '@/lib/visitor-data';
@@ -18,6 +18,7 @@ import { updateDailyVisitorCount } from '@/app/actions/visitor-actions';
 
 interface DashboardViewProps {
     transactions: Transaction[];
+    session: any;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
@@ -42,8 +43,11 @@ const formatDateInTaipei = (dateStr: string, includeTime = true) => {
     }
 };
 
-export default function DashboardView({ transactions }: DashboardViewProps) {
-    const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2026' | 'visitor_stats' | 'reconciliation'>('overview');
+export default function DashboardView({ transactions, session }: DashboardViewProps) {
+    const role = session?.role || 'admin';
+    const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2026' | 'visitor_stats' | 'reconciliation'>(
+        role === 'ops' ? 'ops2026' : 'overview'
+    );
     const [selectedYear, setSelectedYear] = useState<string>('2026');
     const [selectedMonth, setSelectedMonth] = useState<string>('All');
 
@@ -1248,26 +1252,44 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     <h1 className="text-2xl font-bold text-slate-800">光XR - 財務分析儀表板</h1>
                 </div>
 
-                <div className="flex gap-3">
-                    <select
-                        className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-                        value={selectedYear}
-                        onChange={(e) => setSelectedYear(e.target.value)}
-                    >
-                        {years.map(y => <option key={y} value={y}>{y} 年</option>)}
-                    </select>
-                    <select
-                        className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-                        value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(e.target.value)}
-                    >
-                        <option value="All">全年度</option>
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                            <option key={m} value={m}>{m} 月</option>
-                        ))}
-                    </select>
+                <div className="flex items-center gap-4">
+                    <div className="text-right mr-2 hidden md:block">
+                        <div className="text-sm font-bold text-slate-700">{session?.username || 'Guest'}</div>
+                        <div className="text-xs text-slate-400 capitalize">{role} Role</div>
+                    </div>
+                    <div className="flex gap-3">
+                        <select
+                            className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(e.target.value)}
+                        >
+                            {years.map(y => <option key={y} value={y}>{y} 年</option>)}
+                        </select>
+                        <select
+                            className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                        >
+                            <option value="All">全年度</option>
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                <option key={m} value={m}>{m} 月</option>
+                            ))}
+                        </select>
 
-                    <UploadButton />
+                        <UploadButton />
+
+                        <button
+                            onClick={async () => {
+                                // Dynamic import or similar to call server action
+                                const { logout } = await import('@/app/login/actions');
+                                await logout();
+                            }}
+                            className="p-2 bg-slate-100 text-slate-500 hover:text-red-500 rounded-lg transition-colors"
+                            title="登出"
+                        >
+                            <LogOut className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -1287,23 +1309,21 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     value={`$${stats.totalActualCumulative.toLocaleString()}`}
                     sub={`達成率: ${receivableTarget > 0 ? ((stats.totalActualCumulative / receivableTarget) * 100).toFixed(1) : 0}%`}
                     icon={<CheckCircle className="w-8 h-8 text-blue-500 opacity-80" />} />
-
                 <Card title="平均客單價 (ATV)"
                     value={`$${Math.round(stats.avgTicket).toLocaleString()}`}
                     sub="每筆訂單平均"
                     icon={<CreditCard className="w-8 h-8 text-purple-500 opacity-80" />} trend="neutral" />
             </div>
 
-
             <div className="flex space-x-1 mb-6 border-b border-slate-200 overflow-x-auto">
                 {[
-                    { id: 'overview', label: '營運總覽', icon: <TrendingUp className="w-4 h-4 mr-2" /> },
-                    { id: 'growth', label: '成長趨勢 (MoM/YoY)', icon: <TrendingUp className="w-4 h-4 mr-2" /> },
-                    { id: 'invoice', label: '發票稽核', icon: <AlertTriangle className="w-4 h-4 mr-2" /> },
-                    { id: 'reconciliation', label: '對帳中心', icon: <CheckCircle className="w-4 h-4 mr-2" /> },
-                    { id: 'ops2026', label: '2026年運營', icon: <Calendar className="w-4 h-4 mr-2" /> },
-                    { id: 'visitor_stats', label: '遊客統計', icon: <Users className="w-4 h-4 mr-2" /> }
-                ].map(tab => (
+                    { id: 'overview', label: '營運總覽', icon: <TrendingUp className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
+                    { id: 'growth', label: '營收趨勢', icon: <TrendingUp className="w-4 h-4 mr-2" />, roles: ['admin'] },
+                    { id: 'invoice', label: '發票稽核', icon: <AlertTriangle className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
+                    { id: 'ops2026', label: '2026年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
+                    { id: 'visitor_stats', label: '訪客統計', icon: <Users className="w-4 h-4 mr-2" />, roles: ['admin'] },
+                    { id: 'reconciliation', label: '對帳中心', icon: <DollarSign className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
+                ].filter(tab => tab.roles.includes(role)).map((tab) => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as any)}
