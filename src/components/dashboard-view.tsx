@@ -42,7 +42,7 @@ const formatDateInTaipei = (dateStr: string, includeTime = true) => {
 
 export default function DashboardView({ transactions }: DashboardViewProps) {
     const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2026' | 'visitor_stats'>('overview');
-    const [selectedYear, setSelectedYear] = useState<string>('All');
+    const [selectedYear, setSelectedYear] = useState<string>('2026');
     const [selectedMonth, setSelectedMonth] = useState<string>('All');
 
     // Parse dates once
