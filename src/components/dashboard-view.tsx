@@ -10,8 +10,9 @@ import {
     CloudRain, CreditCard, Ticket, DollarSign, Calendar, TrendingUp, AlertTriangle, CheckCircle, Users,
     Thermometer, Sun, Cloud, CloudSnow, CloudLightning, FileText, Smartphone as SmartphoneIcon
 } from 'lucide-react';
-import { getVisitorStats } from '@/lib/visitor-data';
+import { getVisitorStats, getDailyVisitorStats } from '@/lib/visitor-data';
 import { HOLIDAY_DATA_2026, getDailyRemark } from '@/lib/holiday-data-2026';
+import { updateDailyVisitorCount } from '@/app/actions/visitor-actions';
 
 interface DashboardViewProps {
     transactions: Transaction[];
@@ -363,6 +364,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
     const [ops2026Month, setOps2026Month] = useState<number>(new Date().getFullYear() === 2026 ? new Date().getMonth() + 1 : 1);
     const [weatherData, setWeatherData] = useState<Record<string, { min: number, max: number, code: number }>>({});
     const [remarks, setRemarks] = useState<Record<string, string>>({});
+    const [dailyVisitorStats, setDailyVisitorStats] = useState<Record<string, number>>({});
 
     // Initialize Remarks for the selected month
     useEffect(() => {
@@ -455,6 +457,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
         };
 
         fetchWeather();
+        getDailyVisitorStats(2026, ops2026Month).then(setDailyVisitorStats);
     }, [activeTab, ops2026Month]);
 
     const ops2026Data = useMemo(() => {
@@ -490,12 +493,13 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                 isWeekend: date.getDay() === 0 || date.getDay() === 6,
                 dateStr,
                 weather: weatherData[dateStr],
-                remark: remarks[dateStr] || ''
+                remark: remarks[dateStr] || '',
+                visitorCount: dailyVisitorStats[dateStr] || 0
             });
         }
 
         return report;
-    }, [parsedData, ops2026Month, weatherData, remarks]);
+    }, [parsedData, ops2026Month, weatherData, remarks, dailyVisitorStats]);
 
     const ops2026KPI = useMemo(() => {
         // 1. Target
@@ -529,12 +533,18 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
         // 5. Achievement Rate
         const achievementRate = monthlyTarget > 0 ? (actualRevenue / monthlyTarget) * 100 : 0;
 
+        // 6. Visitor Stats
+        const totalVisitors = ops2026Data.reduce((sum, d) => sum + (d.visitorCount || 0), 0);
+        const arpu = totalVisitors > 0 ? actualRevenue / totalVisitors : 0;
+
         return {
             target: monthlyTarget,
             benchmark: dailyBenchmark,
             actual: actualRevenue,
             rate: achievementRate,
-            workingDays
+            workingDays,
+            totalVisitors,
+            arpu
         };
     }, [pivotData, target2026, ops2026Month, ops2026Data]);
 
@@ -992,7 +1002,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                             </div>
 
                             {/* KPI Metrics Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 mb-8">
                                 {/* Card 1: Monthly Target */}
                                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
                                     <div className="flex items-center justify-between mb-2">
@@ -1053,6 +1063,34 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                         {ops2026KPI.rate >= 100 ? '已達標' : `還差 ${(100 - ops2026KPI.rate).toFixed(1)}%`}
                                     </div>
                                 </div>
+
+                                {/* Card 5: Monthly Visitors */}
+                                <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-sm font-semibold text-pink-700">當月體驗人次</h4>
+                                        <Users className="w-4 h-4 text-pink-500" />
+                                    </div>
+                                    <div className="text-2xl font-bold text-pink-900">
+                                        {new Intl.NumberFormat('en-US').format(ops2026KPI.totalVisitors)}
+                                    </div>
+                                    <div className="text-xs text-pink-600 mt-1">
+                                        人
+                                    </div>
+                                </div>
+
+                                {/* Card 6: ARPU */}
+                                <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-sm font-semibold text-cyan-700">人均消費 (ARPU)</h4>
+                                        <TrendingUp className="w-4 h-4 text-cyan-500" />
+                                    </div>
+                                    <div className="text-2xl font-bold text-cyan-900">
+                                        ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.arpu))}
+                                    </div>
+                                    <div className="text-xs text-cyan-600 mt-1">
+                                        平均每人貢獻
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="overflow-x-auto">
@@ -1063,6 +1101,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                             <th className="px-4 py-3">星期</th>
                                             <th className="px-4 py-3">天氣 / 氣溫</th>
                                             <th className="px-4 py-3 text-right">當日收入</th>
+                                            <th className="px-4 py-3 text-right">體驗人次</th>
                                             <th className="px-4 py-3">備註</th>
                                         </tr>
                                     </thead>
@@ -1096,6 +1135,22 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                                 </td>
                                                 <td className="px-4 py-3 text-right text-slate-800 font-mono">
                                                     ${new Intl.NumberFormat('en-US').format(row.revenue)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <input
+                                                        type="number"
+                                                        value={row.visitorCount || ''}
+                                                        onChange={(e) => {
+                                                            const val = parseInt(e.target.value) || 0;
+                                                            setDailyVisitorStats(prev => ({ ...prev, [row.dateStr]: val }));
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            const val = parseInt(e.target.value) || 0;
+                                                            updateDailyVisitorCount(row.dateStr, val);
+                                                        }}
+                                                        placeholder="0"
+                                                        className="w-20 text-right bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-700 transition-colors placeholder:text-slate-200"
+                                                    />
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <input

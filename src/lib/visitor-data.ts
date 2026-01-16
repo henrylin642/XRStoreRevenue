@@ -18,10 +18,38 @@ export async function getVisitorStats() {
     }
 
     const result: Record<number, Record<number, number>> = {};
-    
+
     data.forEach((row: any) => {
         if (!result[row.year]) result[row.year] = {};
         result[row.year][row.month] = row.count;
+    });
+
+    return result;
+}
+
+export async function getDailyVisitorStats(year: number, month: number) {
+    if (!supabase) return {};
+
+    // Construct date range
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    // Get last day of month
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    const { data, error } = await supabase
+        .from('daily_visitor_stats')
+        .select('*')
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+    if (error) {
+        console.error('Error fetching daily visitor stats:', error);
+        return {};
+    }
+
+    const result: Record<string, number> = {}; // date string (YYYY-MM-DD) -> count
+    data.forEach((row: any) => {
+        result[row.date] = row.count;
     });
 
     return result;
