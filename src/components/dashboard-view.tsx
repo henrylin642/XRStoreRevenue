@@ -609,7 +609,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     }
                 }
 
-                data = XLSX.utils.sheet_to_json(ws, { raw: false, range: headerIndex });
+                data = XLSX.utils.sheet_to_json(ws, { raw: true, range: headerIndex });
 
                 if (!data || data.length === 0) {
                     alert('讀取失敗：檔案內容為空或無法解析');
@@ -627,7 +627,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
 
                         // Prevent scientific notation for large numbers (IDs, RRNs)
                         if (typeof v === 'number' && v > 1000000) {
-                            val = v.toLocaleString('fullwide', { useGrouping: false });
+                            val = v.toFixed(0);
                         } else if (typeof v === 'string') {
                             let strVal = v;
                             if (strVal.startsWith('="') && strVal.endsWith('"')) {
@@ -641,7 +641,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                             // Check for strings that XLSX might have formatted as scientific notation
                             if (/^\d\.\d+E\+\d+$/i.test(val)) {
                                 const num = Number(val);
-                                if (!isNaN(num)) val = num.toLocaleString('fullwide', { useGrouping: false });
+                                if (!isNaN(num)) val = num.toFixed(0);
                             }
                         }
                         cleanRow[cleanKey] = val;
@@ -1432,7 +1432,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                                 <div key={key} className="border-b border-slate-50 pb-2">
                                                     <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">{key}</span>
                                                     <span className="text-sm text-slate-700 font-mono break-all">
-                                                        {typeof val === 'number' && val > 10000000 ? val.toLocaleString('fullwide', { useGrouping: false }) : String(val)}
+                                                        {typeof val === 'number' && val > 10000000 ? val.toFixed(0) : String(val)}
                                                     </span>
                                                 </div>
                                             ))}
