@@ -11,7 +11,7 @@ import {
     Thermometer, Sun, Cloud, CloudSnow, CloudLightning, FileText, Smartphone as SmartphoneIcon
 } from 'lucide-react';
 import { getVisitorStats, getDailyVisitorStats } from '@/lib/visitor-data';
-import { HOLIDAY_DATA_2026, getDailyRemark } from '@/lib/holiday-data-2026';
+import { HOLIDAY_DATA_2026, getDailyRemark, isPublicHoliday } from '@/lib/holiday-data-2026';
 import { updateDailyVisitorCount } from '@/app/actions/visitor-actions';
 
 interface DashboardViewProps {
@@ -182,7 +182,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
             if (granularity === 'day') {
                 const dateObj = new Date(d.date);
                 const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-                const isHoliday = !!getDailyRemark(d.date);
+                const isHoliday = isPublicHoliday(d.date);
                 isHighlight = isWeekend || isHoliday;
             }
 

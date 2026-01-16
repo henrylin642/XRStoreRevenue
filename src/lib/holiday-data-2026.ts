@@ -5,12 +5,12 @@ export interface HolidayEvent {
     type: 'holiday' | 'exam' | 'vacation';
 }
 
-export const HOLIDAY_DATA_2026: Record<string, string> = {
-    // Public Holidays
+// Strictly National Holidays and Days Off
+export const PUBLIC_HOLIDAYS_2026: Record<string, string> = {
     '2026-01-01': '元旦',
     '2026-02-14': '春節假期',
     '2026-02-15': '春節假期',
-    '2026-02-16': '除夕前一日', // Adjusted for description
+    '2026-02-16': '除夕前一日',
     '2026-02-17': '除夕',
     '2026-02-18': '春節',
     '2026-02-19': '春節',
@@ -41,40 +41,32 @@ export const HOLIDAY_DATA_2026: Record<string, string> = {
     '2026-12-25': '行憲紀念日',
     '2026-12-26': '行憲連假',
     '2026-12-27': '行憲連假',
+};
 
-    // School Events (Approximated based on search results)
-    // Winter Vacation: Jan 24 - Feb 22
+// Informative School Events/Vacations (Not necessarily days off)
+export const SCHOOL_EVENTS_2026: Record<string, string> = {
     '2026-01-24': '寒假開始',
-    // ... fill in range logic in component or sparse events here. 
-    // For simplicity in map, we might just mark start/end or rely on logic.
-    // Let's put major exam weeks.
-
-    // 1st Semester Final: Jan 12-16
     '2026-01-12': '期末考週',
     '2026-01-13': '期末考週',
     '2026-01-14': '期末考週',
     '2026-01-15': '期末考週',
     '2026-01-16': '期末考週',
-
-    // 2nd Semester Starting Feb 23
-    // Mid-term: Apr 23-24
     '2026-04-23': '期中考',
     '2026-04-24': '期中考',
-
-    // Graduation Exam: Jun 4-5
     '2026-06-04': '畢業考',
     '2026-06-05': '畢業考',
-
-    // Final Exam: Jun 23-24
     '2026-06-23': '期末考',
     '2026-06-24': '期末考',
-
-    // Summer Vacation: Jul 1 - Aug 31
     '2026-07-01': '暑假開始',
     '2026-08-31': '暑假更趨',
 };
 
-// Helper to check range events
+export const HOLIDAY_DATA_2026: Record<string, string> = {
+    ...PUBLIC_HOLIDAYS_2026,
+    ...SCHOOL_EVENTS_2026,
+};
+
+// Helper for UI tooltips/remarks
 export function getDailyRemark(dateStr: string): string {
     if (HOLIDAY_DATA_2026[dateStr]) return HOLIDAY_DATA_2026[dateStr];
 
@@ -93,4 +85,9 @@ export function getDailyRemark(dateStr: string): string {
     if (isJul || isAug) return '暑假';
 
     return '';
+}
+
+// Helper for Chart Coloring (only true for actual days off)
+export function isPublicHoliday(dateStr: string): boolean {
+    return !!PUBLIC_HOLIDAYS_2026[dateStr];
 }
