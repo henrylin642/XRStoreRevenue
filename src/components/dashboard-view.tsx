@@ -526,13 +526,26 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
 
                 // Map platform data to a standard format
                 const parsed = data.map((row: any) => {
+                    // Pre-process row values: strip =" and " common in CSV exports for Excel
+                    const cleanRow: any = {};
+                    Object.entries(row).forEach(([k, v]) => {
+                        let val = v;
+                        if (typeof v === 'string') {
+                            if (v.startsWith('="') && v.endsWith('"')) {
+                                val = v.substring(2, v.length - 1);
+                            } else if (v.startsWith('"') && v.endsWith('"')) {
+                                val = v.substring(1, v.length - 1);
+                            }
+                        }
+                        cleanRow[k] = val;
+                    });
+
                     // Try various common column names for time, amount, and ID
-                    // Newebpay often separates Date and Time columns in some exports
-                    const rawDate = row['訂單交易日期'] || row['支付日期'] || row['交易日期'] || row['Date'] || row['日期'] || row['訂單日期'];
-                    const rawTime = row['交易時間'] || row['時間'] || row['Time'] || '00:00:00';
-                    const amount = Number(row['主支付金額'] || row['特店支付金額'] || row['主支付數值(金額)'] || row['交易金額'] || row['金額'] || row['Amount'] || row['金額(TWD)'] || 0);
-                    const txId = row['特店訂單編號'] || row['藍新金流訂單編號'] || row['訂單編號'] || row['交易編號'] || row['Transaction ID'] || row['序號'] || row['藍新序號'] || row['平台單號'] || '-';
-                    const status = String(row['訂單交易狀態'] || row['交易狀態'] || row['Status'] || row['交易回覆訊息'] || '已付款').trim();
+                    const rawDate = cleanRow['訂單交易日期'] || cleanRow['支付日期'] || cleanRow['交易日期'] || cleanRow['Date'] || cleanRow['日期'] || cleanRow['訂單日期'];
+                    const rawTime = cleanRow['交易時間(台北時間)'] || cleanRow['交易時間'] || cleanRow['時間'] || cleanRow['Time'] || '00:00:00';
+                    const amount = Number(cleanRow['主支付金額'] || cleanRow['特店支付金額'] || cleanRow['主支付數值(金額)'] || cleanRow['交易金額'] || cleanRow['金額'] || cleanRow['Amount'] || cleanRow['金額(TWD)'] || 0);
+                    const txId = cleanRow['特店訂單編號'] || cleanRow['藍新金流交易序號'] || cleanRow['藍新金流訂單編號'] || cleanRow['訂單編號'] || cleanRow['交易編號'] || cleanRow['Transaction ID'] || cleanRow['序號'] || cleanRow['藍新序號'] || cleanRow['平台單號'] || '-';
+                    const status = String(cleanRow['訂單支付狀態'] || cleanRow['主支付狀態'] || cleanRow['訂單交易狀態'] || cleanRow['交易狀態'] || cleanRow['Status'] || cleanRow['交易回覆訊息'] || '已付款').trim();
 
                     let dateStr = '';
                     if (rawDate) {
@@ -546,6 +559,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                         } else {
                             // String handling. Lock to Taipei by appending +08:00 if it's a simple local format
                             let fullStr = String(rawDate).trim();
+                            // If it's a date only, and we have a time, combine them
                             if (rawTime && !fullStr.includes(':')) {
                                 fullStr += ' ' + String(rawTime).trim();
                             }
@@ -571,7 +585,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                         amount,
                         txId,
                         status,
-                        raw: row
+                        raw: cleanRow
                     };
                 }).filter(r => {
                     // Critical: Filter for paid status and valid date
