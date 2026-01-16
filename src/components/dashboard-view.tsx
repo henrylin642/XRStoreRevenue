@@ -624,15 +624,25 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                         // Strip non-printable characters and extra whitespace from key
                         const cleanKey = k.replace(/[^\x20-\x7E\s\u4E00-\u9FFF]/g, '').trim();
                         let val: any = v;
-                        if (typeof v === 'string') {
+
+                        // Prevent scientific notation for large numbers (IDs, RRNs)
+                        if (typeof v === 'number' && v > 1000000) {
+                            val = v.toLocaleString('fullwide', { useGrouping: false });
+                        } else if (typeof v === 'string') {
                             let strVal = v;
                             if (strVal.startsWith('="') && strVal.endsWith('"')) {
                                 strVal = strVal.substring(2, strVal.length - 1);
                             } else if (strVal.startsWith('"') && strVal.endsWith('"')) {
                                 strVal = strVal.substring(1, strVal.length - 1);
                             }
-                            // Clean internal newlines and extra spaces (common in HTML-based Excel exports)
+                            // Clean internal newlines and extra spaces
                             val = strVal.replace(/\s+/g, ' ').trim();
+
+                            // Check for strings that XLSX might have formatted as scientific notation
+                            if (/^\d\.\d+E\+\d+$/i.test(val)) {
+                                const num = Number(val);
+                                if (!isNaN(num)) val = num.toLocaleString('fullwide', { useGrouping: false });
+                            }
                         }
                         cleanRow[cleanKey] = val;
                     });
@@ -656,11 +666,21 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     if (rawDate) {
                         let combinedDate: Date | null = null;
 
-                        // Check if it's already a Date object
+                        // Check if it is a Date object (usually from XLSX)
                         if (rawDate instanceof Date) {
-                            combinedDate = rawDate;
+                            // Important: XLSX dates are often parsed as UTC representing local time.
+                            // To display correctly in Taipei time (+8), we subtract 8 hours here so that
+                            // the final ISO string + Taipei display matches the local time in the file.
+                            combinedDate = new Date(rawDate.getTime() - (8 * 3600 * 1000));
                         } else if (typeof rawDate === 'number') {
-                            combinedDate = new Date(Math.round((rawDate - 25569) * 864e5));
+                            // Serial date from Excel - SSF approach is usually safer
+                            try {
+                                const date = XLSX.SSF.parse_date_code(rawDate);
+                                const asUtc = Date.UTC(date.y, date.m - 1, date.d, date.H, date.M, date.S);
+                                combinedDate = new Date(asUtc - (8 * 3600 * 1000));
+                            } catch (e) {
+                                combinedDate = new Date(Math.round((rawDate - 25569) * 864e5) - (8 * 3600 * 1000));
+                            }
                         } else {
                             let fullStr = String(rawDate).trim();
 
@@ -1411,7 +1431,9 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                             {Object.entries(inspectedRow).map(([key, val]) => (
                                                 <div key={key} className="border-b border-slate-50 pb-2">
                                                     <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">{key}</span>
-                                                    <span className="text-sm text-slate-700 font-mono break-all">{String(val)}</span>
+                                                    <span className="text-sm text-slate-700 font-mono break-all">
+                                                        {typeof val === 'number' && val > 10000000 ? val.toLocaleString('fullwide', { useGrouping: false }) : String(val)}
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
