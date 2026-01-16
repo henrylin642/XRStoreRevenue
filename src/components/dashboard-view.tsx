@@ -543,6 +543,14 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
             idFields: ['訂單編號', '廠商端訂單編號'],
             statusFields: ['交易行為', '狀態'],
             successStatuses: ['支付', '成功', 'SUCCESS', 'Paid']
+        },
+        '掃碼-LINE Pay': {
+            dateFields: ['交易日期', '日期'],
+            timeFields: ['交易時間', '時間'],
+            amountFields: ['付款金額', '支付金額', '金額'],
+            idFields: ['交易號碼', '訂單號碼'],
+            statusFields: ['交易狀態', '付款狀態'],
+            successStatuses: ['PAYMENT', 'CAPTURE', '成功', 'SUCCESS', 'Paid']
         }
     };
 
@@ -606,6 +614,12 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                             combinedDate = new Date(Math.round((rawDate - 25569) * 864e5));
                         } else {
                             let fullStr = String(rawDate).trim();
+
+                            // Special handling for LINE Pay YYYYMMDDHHMMSS (14 digits)
+                            if (/^\d{14}$/.test(fullStr)) {
+                                fullStr = `${fullStr.substring(0, 4)}-${fullStr.substring(4, 6)}-${fullStr.substring(6, 8)} ${fullStr.substring(8, 10)}:${fullStr.substring(10, 12)}:${fullStr.substring(12, 14)}`;
+                            }
+
                             if (rawTime && !fullStr.includes(':')) {
                                 fullStr += ' ' + String(rawTime).trim();
                             }
@@ -1173,6 +1187,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                     <option value="一般信用卡">一般信用卡</option>
                                     <option value="掃碼-全支付">掃碼-全支付</option>
                                     <option value="掃碼-街口支付">掃碼-街口支付</option>
+                                    <option value="掃碼-LINE Pay">掃碼-LINE Pay</option>
                                 </select>
                                 <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm font-medium cursor-pointer hover:bg-blue-700 transition-colors">
                                     <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handlePlatformUpload} />
