@@ -201,6 +201,17 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
         return Array.from(methods).sort();
     }, [parsedData]);
 
+    // Identify Refund Invoices (Invoice numbers that have at least one negative amount record)
+    const refundSet = useMemo(() => {
+        const set = new Set<string>();
+        parsedData.forEach(t => {
+            if (t.invoiceNumber && t.invoiceNumber.trim() !== '-' && t.amount < 0) {
+                set.add(t.invoiceNumber);
+            }
+        });
+        return set;
+    }, [parsedData]);
+
     // Data for Invoice List (Applied all filters + Only Valid Invoices)
     const invoiceTabData = useMemo(() => {
         let data = parsedData;
@@ -227,8 +238,8 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
             data = data.filter(t => t.paymentMethod === invoicePaymentFilter);
         }
 
-        // Only show records with Invoice Number
-        data = data.filter(t => t.invoiceNumber && t.invoiceNumber.trim() !== '' && t.invoiceNumber !== '-');
+        // Only show records with Invoice Number <--- REMOVED FILTER
+        // data = data.filter(t => t.invoiceNumber && t.invoiceNumber.trim() !== '' && t.invoiceNumber !== '-');
 
         // Sort by Date DESC (Newest First)
         return data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -255,26 +266,62 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
         }
 
         // Anomaly Logic
+        // Anomaly Logic
         const issues: { ym: string, type: string, desc: string, invoices: string[] }[] = [];
         const groupedByYM: Record<string, { num: number, full: string }[]> = {};
+
+        // Group for Duplicate/Refund Check
+        const invoiceMap: Record<string, typeof data> = {};
 
         data.forEach(t => {
             // Check for Missing Invoice Number (Anomaly #2)
             if (!t.invoiceNumber || t.invoiceNumber.trim() === '' || t.invoiceNumber === '-') {
+                // We typically handle missing invoices in the list view, but if we want them in anomaly:
+                // Let's keep them here as "漏開發票"
                 issues.push({
                     ym: t.ym,
                     type: '漏開發票',
                     desc: `交易成功但未開立發票 (${t.date})`,
-                    invoices: [t.id] // Use Order ID or just indicate missing
+                    invoices: [t.id]
                 });
                 return;
             }
+
+            if (!invoiceMap[t.invoiceNumber]) invoiceMap[t.invoiceNumber] = [];
+            invoiceMap[t.invoiceNumber].push(t);
 
             if (t.invoiceNumber.length > 2) {
                 const numPart = parseInt(t.invoiceNumber.slice(2));
                 if (!isNaN(numPart)) {
                     if (!groupedByYM[t.ym]) groupedByYM[t.ym] = [];
-                    groupedByYM[t.ym].push({ num: numPart, full: t.invoiceNumber });
+                    // Avoid adding duplicates to this list for gap checking
+                    if (!groupedByYM[t.ym].some(item => item.full === t.invoiceNumber)) {
+                        groupedByYM[t.ym].push({ num: numPart, full: t.invoiceNumber });
+                    }
+                }
+            }
+        });
+
+        // Check Invoice Map for Duplicates / Refunds
+        Object.entries(invoiceMap).forEach(([invNum, txs]) => {
+            if (txs.length > 1) {
+                const hasNegative = txs.some(t => t.amount < 0);
+                const ym = txs[0].ym; // use the first record's YM
+
+                if (hasNegative) {
+                    issues.push({
+                        ym,
+                        type: '銷退',
+                        desc: `發票 ${invNum} 包含銷退記錄 (正負抵銷或退款)`,
+                        invoices: [invNum]
+                    });
+                } else {
+                    issues.push({
+                        ym,
+                        type: '重複',
+                        desc: `發票號碼 ${invNum} 重複出現 ${txs.length} 次`,
+                        invoices: [invNum]
+                    });
                 }
             }
         });
@@ -296,14 +343,6 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                             invoices: [list[i - 1].full, list[i].full]
                         });
                     }
-                }
-                if (diff === 0) {
-                    issues.push({
-                        ym,
-                        type: '重複',
-                        desc: `發票號碼 ${list[i].full} 重複出現`,
-                        invoices: [list[i].full]
-                    });
                 }
             }
         });
@@ -922,19 +961,21 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                         <table className="w-full text-sm text-left">
                                             <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                                                 <tr>
+                                                    <th className="px-4 py-3">訂單編號</th>
                                                     <th className="px-4 py-3">發票號碼</th>
                                                     <th className="px-4 py-3">交易時間</th>
                                                     <th className="px-4 py-3 text-right">發票金額</th>
                                                     <th className="px-4 py-3">支付方式</th>
+                                                    <th className="px-4 py-3">備註</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
                                                 {invoiceTabData.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan={4} className="p-8 text-center text-slate-500">沒有符合條件的發票資料</td>
+                                                        <td colSpan={6} className="p-8 text-center text-slate-500">沒有符合條件的發票資料</td>
                                                     </tr>
                                                 ) : (
-                                                    <InvoiceTablePagination data={invoiceTabData} />
+                                                    <InvoiceTablePagination data={invoiceTabData} refundSet={refundSet} />
                                                 )}
                                             </tbody>
                                         </table>
@@ -1245,7 +1286,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
     )
 }
 
-function InvoiceTablePagination({ data }: { data: any[] }) {
+function InvoiceTablePagination({ data, refundSet }: { data: any[], refundSet: Set<string> }) {
     const [page, setPage] = useState(1);
     const pageSize = 50;
     const totalPages = Math.ceil(data.length / pageSize);
@@ -1258,8 +1299,15 @@ function InvoiceTablePagination({ data }: { data: any[] }) {
     const currentData = useMemo(() => {
         // Sort by Invoice Number if available, else Date
         const sorted = [...data].sort((a, b) => {
+            // Put missing invoices at the top? Or just standard sort?
+            // User requested standard sort usually, but let's stick to Date DESC as per main logic,
+            // OR Invoice Number desc.
+            // The main logic sorts by Date DESC. 
+            // The local currentData here sorts by Invoice Number.
+            // Let's keep Invoice Number sort for consistency with "list" view grouping
             const numA = a.invoiceNumber || '';
             const numB = b.invoiceNumber || '';
+            if (numA === numB) return new Date(b.date).getTime() - new Date(a.date).getTime();
             return numA.localeCompare(numB);
         });
         const start = (page - 1) * pageSize;
@@ -1268,25 +1316,49 @@ function InvoiceTablePagination({ data }: { data: any[] }) {
 
     return (
         <>
-            {currentData.map((t, idx) => (
-                <tr key={`${t.orderId}-${idx}`} className="hover:bg-slate-50 transition-colors group">
-                    <td className="px-4 py-3 font-mono text-slate-700 font-medium group-hover:text-blue-600 transition-colors">
-                        {t.invoiceNumber || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">
-                        {t.date}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono font-medium text-slate-700">
-                        ${t.amount.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                        <span className="bg-slate-100 px-2 py-1 rounded text-xs">{t.paymentMethod || '其他'}</span>
-                    </td>
-                </tr>
-            ))}
+            {/* Need to update header in parent or here? The parent defines the <thead>. 
+                We should technically update the parent component's <thead> to match columns.
+                But `InvoiceTablePagination` only renders <tr>. 
+                Wait, I need to update the <thead> in `DashboardView` as well!
+                It was at lines 924-929.
+            */}
+            {currentData.map((t, idx) => {
+                const hasInvoice = t.invoiceNumber && t.invoiceNumber.trim() !== '' && t.invoiceNumber !== '-';
+                const isRefund = hasInvoice && refundSet.has(t.invoiceNumber);
+                const invoiceStyle = hasInvoice
+                    ? 'font-mono text-slate-700 font-medium group-hover:text-blue-600'
+                    : 'text-red-500 font-bold'; // Red for missing invoice
+
+                let remark = '';
+                if (!hasInvoice) remark = '無發票記錄';
+                else if (isRefund) remark = '銷退';
+
+                return (
+                    <tr key={`${t.orderId}-${idx}`} className="hover:bg-slate-50 transition-colors group">
+                        <td className="px-4 py-3 font-mono text-slate-500 text-xs">
+                            {t.id}
+                        </td>
+                        <td className={`px-4 py-3 ${invoiceStyle} transition-colors`}>
+                            {hasInvoice ? t.invoiceNumber : '無發票記錄'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">
+                            {t.date}
+                        </td>
+                        <td className={`px-4 py-3 text-right font-mono font-medium ${t.amount < 0 ? 'text-red-600' : 'text-slate-700'}`}>
+                            ${t.amount.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                            <span className="bg-slate-100 px-2 py-1 rounded text-xs">{t.paymentMethod || '其他'}</span>
+                        </td>
+                        <td className={`px-4 py-3 text-xs font-bold ${remark === '無發票記錄' ? 'text-red-500' : 'text-slate-500'}`}>
+                            {remark}
+                        </td>
+                    </tr>
+                );
+            })}
             {totalPages > 1 && (
                 <tr>
-                    <td colSpan={4} className="p-4 border-t border-slate-100 bg-slate-50">
+                    <td colSpan={6} className="p-4 border-t border-slate-100 bg-slate-50">
                         <div className="flex justify-between items-center">
                             <span className="text-xs text-slate-500">
                                 顯示 {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, data.length)} 筆，共 {data.length} 筆
