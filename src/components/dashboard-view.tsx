@@ -535,6 +535,14 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
             idFields: ['商戶交易編號', '訂單編號'],
             statusFields: ['交易類型', '狀態'],
             successStatuses: ['付款', '成功', 'SUCCESS', 'Paid']
+        },
+        '掃碼-街口支付': {
+            dateFields: ['交易時間', '日期'],
+            timeFields: ['時間'],
+            amountFields: ['支付金額', '訂單金額', '金額'],
+            idFields: ['訂單編號', '廠商端訂單編號'],
+            statusFields: ['交易行為', '狀態'],
+            successStatuses: ['支付', '成功', 'SUCCESS', 'Paid']
         }
     };
 
@@ -1168,6 +1176,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                 >
                                     <option value="一般信用卡">一般信用卡</option>
                                     <option value="掃碼-全支付">掃碼-全支付</option>
+                                    <option value="掃碼-街口支付">掃碼-街口支付</option>
                                 </select>
                                 <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm font-medium cursor-pointer hover:bg-blue-700 transition-colors">
                                     <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handlePlatformUpload} />
