@@ -271,6 +271,9 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
             });
         }
 
+        // Only show successful transactions for invoice audit
+        data = data.filter(t => t.type === '交易成功');
+
         // Payment Method Filter
         if (invoicePaymentFilter !== 'All') {
             data = data.filter(t => t.paymentMethod === invoicePaymentFilter);
@@ -302,6 +305,9 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                 return yearMatch && monthMatch;
             });
         }
+
+        // Only successful transactions for anomaly detection
+        data = data.filter(t => t.type === '交易成功');
 
         // Anomaly Logic
         // Anomaly Logic
