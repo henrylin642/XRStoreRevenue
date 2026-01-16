@@ -556,7 +556,9 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                 let dateStr = '';
                 const rawDate = findVal(rule.dateFields);
                 if (rawDate) {
-                    if (typeof rawDate === 'number') {
+                    if (rawDate instanceof Date) {
+                        dateStr = rawDate.toISOString();
+                    } else if (typeof rawDate === 'number') {
                         try {
                             const date = XLSX.SSF.parse_date_code(rawDate);
                             const ds = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')} ${String(date.H).padStart(2, '0')}:${String(date.M).padStart(2, '0')}:${String(date.S).padStart(2, '0')}`;
@@ -567,9 +569,15 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                             if (!isNaN(d.getTime())) dateStr = d.toISOString();
                         }
                     } else {
-                        const clean = String(rawDate).trim().replace(/\//g, '-');
-                        const d = new Date(clean + ' +08:00');
-                        if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        const clean = String(rawDate).trim();
+                        if (clean.includes('Z') || (clean.includes('T') && clean.includes(':'))) {
+                            const d = new Date(clean);
+                            if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        } else {
+                            const formatted = clean.replace(/\//g, '-');
+                            const d = new Date(formatted + ' +08:00');
+                            if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        }
                     }
                 }
 
@@ -596,7 +604,9 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                 const rawDate = findVal(rule.dateFields);
                 const rawTime = findVal(rule.timeFields);
                 if (rawDate) {
-                    if (typeof rawDate === 'number') {
+                    if (rawDate instanceof Date) {
+                        dateStr = rawDate.toISOString();
+                    } else if (typeof rawDate === 'number') {
                         try {
                             const date = XLSX.SSF.parse_date_code(rawDate);
                             const ds = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')} ${String(date.H).padStart(2, '0')}:${String(date.M).padStart(2, '0')}:${String(date.S).padStart(2, '0')}`;
@@ -607,17 +617,23 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                             if (!isNaN(d.getTime())) dateStr = d.toISOString();
                         }
                     } else {
-                        let fullStr = String(rawDate).trim().replace(/\//g, '-');
-                        if (rawTime) fullStr += ' ' + String(rawTime).trim();
+                        let fullStr = String(rawDate).trim();
+                        if (fullStr.includes('Z') || (fullStr.includes('T') && fullStr.includes(':'))) {
+                            const d = new Date(fullStr);
+                            if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        } else {
+                            fullStr = fullStr.replace(/\//g, '-');
+                            if (rawTime) fullStr += ' ' + String(rawTime).trim();
 
-                        // Special handling for LINE Pay YYYYMMDDHHMMSS as date
-                        if (/^\d{14}$/.test(fullStr.replace(/[-\s:]/g, ''))) {
-                            const s = fullStr.replace(/[-\s:]/g, '');
-                            fullStr = `${s.substring(0, 4)}-${s.substring(4, 6)}-${s.substring(6, 8)} ${s.substring(8, 10)}:${s.substring(10, 12)}:${s.substring(12, 14)}`;
+                            // Special handling for LINE Pay YYYYMMDDHHMMSS as date
+                            if (/^\d{14}$/.test(fullStr.replace(/[-\s:]/g, ''))) {
+                                const s = fullStr.replace(/[-\s:]/g, '');
+                                fullStr = `${s.substring(0, 4)}-${s.substring(4, 6)}-${s.substring(6, 8)} ${s.substring(8, 10)}:${s.substring(10, 12)}:${s.substring(12, 14)}`;
+                            }
+
+                            const d = new Date(fullStr + ' +08:00');
+                            if (!isNaN(d.getTime())) dateStr = d.toISOString();
                         }
-
-                        const d = new Date(fullStr + ' +08:00');
-                        if (!isNaN(d.getTime())) dateStr = d.toISOString();
                     }
                 }
 
@@ -651,7 +667,9 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                 let dateStr = '';
                 const rawDate = findVal(rule.dateFields);
                 if (rawDate) {
-                    if (typeof rawDate === 'number') {
+                    if (rawDate instanceof Date) {
+                        dateStr = rawDate.toISOString();
+                    } else if (typeof rawDate === 'number') {
                         try {
                             const date = XLSX.SSF.parse_date_code(rawDate);
                             const ds = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')} ${String(date.H).padStart(2, '0')}:${String(date.M).padStart(2, '0')}:${String(date.S).padStart(2, '0')}`;
@@ -662,10 +680,16 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                             if (!isNaN(d.getTime())) dateStr = d.toISOString();
                         }
                     } else {
-                        // Use the multi-line combined date string cleaning
-                        const clean = String(rawDate).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\//g, '-');
-                        const d = new Date(clean + ' +08:00');
-                        if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        const clean = String(rawDate).trim();
+                        if (clean.includes('Z') || (clean.includes('T') && clean.includes(':'))) {
+                            const d = new Date(clean);
+                            if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        } else {
+                            // Use the multi-line combined date string cleaning
+                            const formatted = clean.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\//g, '-');
+                            const d = new Date(formatted + ' +08:00');
+                            if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        }
                     }
                 }
 
@@ -691,7 +715,9 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                 let dateStr = '';
                 const rawDate = findVal(rule.dateFields);
                 if (rawDate) {
-                    if (typeof rawDate === 'number') {
+                    if (rawDate instanceof Date) {
+                        dateStr = rawDate.toISOString();
+                    } else if (typeof rawDate === 'number') {
                         try {
                             const date = XLSX.SSF.parse_date_code(rawDate);
                             const ds = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')} ${String(date.H).padStart(2, '0')}:${String(date.M).padStart(2, '0')}:${String(date.S).padStart(2, '0')}`;
@@ -702,9 +728,15 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                             if (!isNaN(d.getTime())) dateStr = d.toISOString();
                         }
                     } else {
-                        const clean = String(rawDate).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\//g, '-');
-                        const d = new Date(clean + ' +08:00');
-                        if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        const clean = String(rawDate).trim();
+                        if (clean.includes('Z') || (clean.includes('T') && clean.includes(':'))) {
+                            const d = new Date(clean);
+                            if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        } else {
+                            const formatted = clean.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\//g, '-');
+                            const d = new Date(formatted + ' +08:00');
+                            if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        }
                     }
                 }
 
@@ -715,9 +747,9 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
             dateFields: ['交易日期', '日期'],
             timeFields: ['時間'],
             amountFields: ['支付金額', '交易金額', '金額'],
-            idFields: ['訂單號碼', '一卡通交易編號', '交易號碼'],
+            idFields: ['訂單號碼', '交易號碼', '一卡通交易編號'],
             statusFields: ['交易狀態', '付款狀態'],
-            successStatuses: ['收款成功', '已撥款', '已付款', '成功', 'SUCCESS', 'Paid'],
+            successStatuses: ['付款完畢', '已請款', '已撥款', '收款成功', '已付款', '成功', 'SUCCESS', 'Paid'],
             mapRow: (row, rule) => {
                 const findVal = (fields: string[]) => {
                     for (const f of fields) if (row[f] !== undefined) return row[f];
@@ -730,7 +762,9 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                 let dateStr = '';
                 const rawDate = findVal(rule.dateFields);
                 if (rawDate) {
-                    if (typeof rawDate === 'number') {
+                    if (rawDate instanceof Date) {
+                        dateStr = rawDate.toISOString();
+                    } else if (typeof rawDate === 'number') {
                         try {
                             const date = XLSX.SSF.parse_date_code(rawDate);
                             const ds = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')} ${String(date.H).padStart(2, '0')}:${String(date.M).padStart(2, '0')}:${String(date.S).padStart(2, '0')}`;
@@ -741,9 +775,15 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                             if (!isNaN(d.getTime())) dateStr = d.toISOString();
                         }
                     } else {
-                        const clean = String(rawDate).trim().replace(/\//g, '-');
-                        const d = new Date(clean + ' +08:00');
-                        if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        const clean = String(rawDate).trim();
+                        if (clean.includes('Z') || (clean.includes('T') && clean.includes(':'))) {
+                            const d = new Date(clean);
+                            if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        } else {
+                            const formatted = clean.replace(/\//g, '-');
+                            const d = new Date(formatted + ' +08:00');
+                            if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                        }
                     }
                 }
 
@@ -803,8 +843,8 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     // Pre-process row values: strip =" and " common in CSV exports for Excel
                     const cleanRow: any = {};
                     Object.entries(row).forEach(([k, v]) => {
-                        // Strip non-printable characters and extra whitespace from key
-                        const cleanKey = k.replace(/[^\x20-\x7E\s\u4E00-\u9FFF]/g, '').trim();
+                        // Strip non-printable characters, BOM, and surrounding quotes from key
+                        const cleanKey = k.replace(/[^\x20-\x7E\s\u4E00-\u9FFF]/g, '').replace(/^"|"$/g, '').trim();
                         let val: any = v;
 
                         if (typeof v === 'string') {
