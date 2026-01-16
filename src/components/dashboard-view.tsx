@@ -504,7 +504,11 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
     const [platformData, setPlatformData] = useState<any[]>([]);
     const [isMatching, setIsMatching] = useState(false);
     const [reconStartDate, setReconStartDate] = useState('2026-01-01');
-    const [reconEndDate, setReconEndDate] = useState('2026-01-31');
+    const [reconEndDate, setReconEndDate] = useState<string>(() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    });
+    const [reconPaymentMethod, setReconPaymentMethod] = useState<string>('一般信用卡');
     const [inspectedRow, setInspectedRow] = useState<any | null>(null);
 
     const handlePlatformUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -541,11 +545,11 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     });
 
                     // Try various common column names for time, amount, and ID
-                    const rawDate = cleanRow['訂單交易日期'] || cleanRow['支付日期'] || cleanRow['交易日期'] || cleanRow['Date'] || cleanRow['日期'] || cleanRow['訂單日期'];
+                    const rawDate = cleanRow['訂單交易日期'] || cleanRow['支付日期'] || cleanRow['交易日期'] || cleanRow['Date'] || cleanRow['日期'] || cleanRow['訂單日期'] || cleanRow['交易時間'];
                     const rawTime = cleanRow['交易時間(台北時間)'] || cleanRow['交易時間'] || cleanRow['時間'] || cleanRow['Time'] || '00:00:00';
-                    const amount = Number(cleanRow['主支付金額'] || cleanRow['特店支付金額'] || cleanRow['主支付數值(金額)'] || cleanRow['交易金額'] || cleanRow['金額'] || cleanRow['Amount'] || cleanRow['金額(TWD)'] || 0);
-                    const txId = cleanRow['特店訂單編號'] || cleanRow['藍新金流交易序號'] || cleanRow['藍新金流訂單編號'] || cleanRow['訂單編號'] || cleanRow['交易編號'] || cleanRow['Transaction ID'] || cleanRow['序號'] || cleanRow['藍新序號'] || cleanRow['平台單號'] || '-';
-                    const status = String(cleanRow['訂單支付狀態'] || cleanRow['主支付狀態'] || cleanRow['訂單交易狀態'] || cleanRow['交易狀態'] || cleanRow['Status'] || cleanRow['交易回覆訊息'] || '已付款').trim();
+                    const amount = Number(cleanRow['支付金額'] || cleanRow['主支付金額'] || cleanRow['特店支付金額'] || cleanRow['主支付數值(金額)'] || cleanRow['交易金額'] || cleanRow['金額'] || cleanRow['Amount'] || cleanRow['金額(TWD)'] || 0);
+                    const txId = cleanRow['商戶交易編號'] || cleanRow['特店訂單編號'] || cleanRow['藍新金流交易序號'] || cleanRow['藍新金流訂單編號'] || cleanRow['訂單編號'] || cleanRow['交易編號'] || cleanRow['Transaction ID'] || cleanRow['序號'] || cleanRow['藍新序號'] || cleanRow['平台單號'] || '-';
+                    const status = String(cleanRow['交易類型'] || cleanRow['訂單支付狀態'] || cleanRow['主支付狀態'] || cleanRow['訂單交易狀態'] || cleanRow['交易狀態'] || cleanRow['Status'] || cleanRow['交易回覆訊息'] || '已付款').trim();
 
                     let dateStr = '';
                     if (rawDate) {
@@ -564,7 +568,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                 fullStr += ' ' + String(rawTime).trim();
                             }
 
-                            // Replace / with - for standard parsing
+                            // PXPay format 2026/01/10 12:07:29
                             const standardized = fullStr.replace(/\//g, '-');
 
                             // If the string doesn't have a timezone indicator, assume Asia/Taipei
@@ -593,7 +597,8 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
 
                     const paidStatuses = [
                         '已付款', '付款成功', '成功', 'Success', 'Paid',
-                        'SUCCESS', 'SUCCESS_PAY', 'AUTHORIZE_SUCCESS', '授權成功'
+                        'SUCCESS', 'SUCCESS_PAY', 'AUTHORIZE_SUCCESS', '授權成功',
+                        '付款' // PXPay status
                     ];
 
                     if (r.status && !paidStatuses.some(s => r.status.includes(s))) return false;
@@ -618,9 +623,9 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
     const reconciliationMatches = useMemo(() => {
         if (!platformData.length) return [];
 
-        // 1. Filter system records for General Credit Card AND selected date range
+        // 1. Filter system records for Selected Payment Method AND date range
         const systemRecords = parsedData.filter(t => {
-            if (t.paymentMethod !== '一般信用卡' || t.type !== '交易成功') return false;
+            if (t.paymentMethod !== reconPaymentMethod || t.type !== '交易成功') return false;
 
             // Format date to YYYY-MM-DD for comparison
             const dateStr = `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
@@ -1130,8 +1135,13 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                         className="bg-transparent text-sm text-slate-700 outline-none"
                                     />
                                 </div>
-                                <select className="bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
-                                    <option>一般信用卡</option>
+                                <select
+                                    value={reconPaymentMethod}
+                                    onChange={(e) => setReconPaymentMethod(e.target.value)}
+                                    className="bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="一般信用卡">一般信用卡</option>
+                                    <option value="掃碼-全支付">掃碼-全支付</option>
                                 </select>
                                 <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm font-medium cursor-pointer hover:bg-blue-700 transition-colors">
                                     <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handlePlatformUpload} />
