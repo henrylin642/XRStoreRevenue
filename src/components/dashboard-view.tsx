@@ -528,18 +528,26 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     const dateRaw = row['訂單交易日期'] || row['支付日期'] || row['交易時間'] || row['交易日期'] || row['Date'] || row['時間'] || row['訂單日期'] || row['交易時間(台北時間)'];
                     const amount = Number(row['主支付金額'] || row['特店支付金額'] || row['主支付數值(金額)'] || row['交易金額'] || row['金額'] || row['Amount'] || row['金額(TWD)'] || 0);
                     const txId = row['特店訂單編號'] || row['藍新金流訂單編號'] || row['訂單編號'] || row['交易編號'] || row['Transaction ID'] || row['序號'] || row['藍新序號'] || row['平台單號'] || '-';
-                    const status = row['訂單交易狀態'] || row['交易狀態'] || row['Status'] || '已付款';
+                    const status = String(row['訂單交易狀態'] || row['交易狀態'] || row['Status'] || row['交易回覆訊息'] || '已付款').trim();
 
                     let dateStr = '';
                     if (dateRaw) {
-                        const d = new Date(dateRaw);
-                        if (!isNaN(d.getTime())) {
-                            dateStr = d.toISOString();
-                        } else if (typeof dateRaw === 'string') {
-                            // Try common format: 2026/01/16 12:34:56
-                            const cleaned = dateRaw.replace(/\//g, '-');
-                            const d2 = new Date(cleaned);
-                            if (!isNaN(d2.getTime())) dateStr = d2.toISOString();
+                        if (typeof dateRaw === 'number') {
+                            // Handle Excel serial date (Number of days since 1899-12-30)
+                            const date = new Date(Math.round((dateRaw - 25569) * 864e5));
+                            dateStr = date.toISOString();
+                        } else {
+                            const d = new Date(dateRaw);
+                            if (!isNaN(d.getTime())) {
+                                // If it's a valid date, use it. But beware of timezone shifts if it's just '2026/01/01'
+                                // We want it to stay in local time as much as possible for comparison
+                                dateStr = d.toISOString();
+                            } else if (typeof dateRaw === 'string') {
+                                // Try common format: 2026/01/16 12:34:56
+                                const cleaned = dateRaw.replace(/\//g, '-');
+                                const d2 = new Date(cleaned);
+                                if (!isNaN(d2.getTime())) dateStr = d2.toISOString();
+                            }
                         }
                     }
 
@@ -552,9 +560,19 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     };
                 }).filter(r => {
                     // Critical: Filter for paid status and valid date
-                    if (r.date === '') return false;
-                    // If CSV has status column, only keep Paid/Success
-                    if (r.status && !['已付款', '付款成功', '成功', 'Success', 'Paid'].includes(r.status)) return false;
+                    if (r.date === '' || isNaN(r.amount)) return false;
+
+                    // Comprehensive whitelist of "Paid" statuses
+                    const paidStatuses = [
+                        '已付款', '付款成功', '成功', 'Success', 'Paid',
+                        'SUCCESS', 'SUCCESS_PAY', 'AUTHORIZE_SUCCESS', '授權成功'
+                    ];
+
+                    if (r.status && !paidStatuses.some(s => r.status.includes(s))) return false;
+
+                    // Final sanity check: if amount is 0, it shouldn't be matched unless it's a specific type
+                    if (r.amount === 0) return false;
+
                     return true;
                 });
 
