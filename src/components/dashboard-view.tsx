@@ -10,6 +10,7 @@ import {
     CloudRain, CreditCard, Ticket, DollarSign, Calendar, TrendingUp, AlertTriangle, CheckCircle, Users,
     Thermometer, Sun, Cloud, CloudSnow, CloudLightning, FileText, Smartphone as SmartphoneIcon
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { getVisitorStats, getDailyVisitorStats } from '@/lib/visitor-data';
 import { HOLIDAY_DATA_2026, getDailyRemark, isPublicHoliday } from '@/lib/holiday-data-2026';
 import { updateDailyVisitorCount } from '@/app/actions/visitor-actions';
@@ -41,7 +42,7 @@ const formatDateInTaipei = (dateStr: string, includeTime = true) => {
 };
 
 export default function DashboardView({ transactions }: DashboardViewProps) {
-    const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2026' | 'visitor_stats'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2026' | 'visitor_stats' | 'reconciliation'>('overview');
     const [selectedYear, setSelectedYear] = useState<string>('2026');
     const [selectedMonth, setSelectedMonth] = useState<string>('All');
 
@@ -498,7 +499,106 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
     const [remarks, setRemarks] = useState<Record<string, string>>({});
     const [dailyVisitorStats, setDailyVisitorStats] = useState<Record<string, number>>({});
 
-    // Initialize Remarks for the selected month
+    // Reconciliation State
+    const [platformData, setPlatformData] = useState<any[]>([]);
+    const [isMatching, setIsMatching] = useState(false);
+
+    const handlePlatformUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.[0]) return;
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const bstr = event.target?.result;
+            const wb = XLSX.read(bstr, { type: 'binary' });
+            const wsname = wb.SheetNames[0];
+            const ws = wb.Sheets[wsname];
+            const data = XLSX.utils.sheet_to_json(ws);
+
+            // Map platform data to a standard format
+            const parsed = data.map((row: any) => {
+                const dateRaw = row['交易時間'] || row['交易日期'] || row['Date'] || row['時間'];
+                const amount = Number(row['交易金額'] || row['金額'] || row['Amount'] || 0);
+                const txId = row['訂單編號'] || row['交易編號'] || row['Transaction ID'] || row['序號'] || '-';
+
+                let dateStr = '';
+                if (dateRaw) {
+                    const d = new Date(dateRaw);
+                    if (!isNaN(d.getTime())) dateStr = d.toISOString();
+                }
+
+                return {
+                    date: dateStr,
+                    amount,
+                    txId,
+                    raw: row
+                };
+            }).filter(r => r.date !== '');
+
+            setPlatformData(parsed);
+        };
+        reader.readAsBinaryString(file);
+    };
+
+    const reconciliationMatches = useMemo(() => {
+        if (!platformData.length) return [];
+
+        // Filter system records for General Credit Card
+        const systemRecords = parsedData.filter(t => t.paymentMethod === '一般信用卡' && t.type === '交易成功');
+
+        const matchedPlatformIndices = new Set<number>();
+        const matches: { system?: any, platform?: any, status: 'matched' | 'mismatch' | 'missing_system' | 'missing_platform' }[] = [];
+
+        // 1. Try to match each system record
+        systemRecords.forEach(sys => {
+            const sysTime = new Date(sys.date).getTime();
+            let bestMatchIdx = -1;
+            let minDiff = 5 * 60 * 1000; // 5 mins tolerance
+
+            platformData.forEach((plat, pIdx) => {
+                if (matchedPlatformIndices.has(pIdx)) return;
+                if (Math.abs(plat.amount - sys.amount) > 0.1) return; // Amount mismatch
+
+                const platTime = new Date(plat.date).getTime();
+                const diff = Math.abs(platTime - sysTime);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    bestMatchIdx = pIdx;
+                }
+            });
+
+            if (bestMatchIdx !== -1) {
+                matchedPlatformIndices.add(bestMatchIdx);
+                matches.push({
+                    system: sys,
+                    platform: platformData[bestMatchIdx],
+                    status: 'matched'
+                });
+            } else {
+                matches.push({
+                    system: sys,
+                    status: 'missing_platform'
+                });
+            }
+        });
+
+        // 2. Add unmatched platform records
+        platformData.forEach((plat, pIdx) => {
+            if (!matchedPlatformIndices.has(pIdx)) {
+                matches.push({
+                    platform: plat,
+                    status: 'missing_system'
+                });
+            }
+        });
+
+        // Sort by date (either system or platform)
+        return matches.sort((a, b) => {
+            const timeA = new Date(a.system?.date || a.platform?.date).getTime();
+            const timeB = new Date(b.system?.date || b.platform?.date).getTime();
+            return timeB - timeA; // Descending
+        });
+    }, [parsedData, platformData]);
+
     useEffect(() => {
         const year = 2026;
         const daysInMonth = new Date(year, ops2026Month, 0).getDate();
@@ -742,6 +842,7 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                     { id: 'overview', label: '營運總覽', icon: <TrendingUp className="w-4 h-4 mr-2" /> },
                     { id: 'growth', label: '成長趨勢 (MoM/YoY)', icon: <TrendingUp className="w-4 h-4 mr-2" /> },
                     { id: 'invoice', label: '發票稽核', icon: <AlertTriangle className="w-4 h-4 mr-2" /> },
+                    { id: 'reconciliation', label: '對帳中心', icon: <CheckCircle className="w-4 h-4 mr-2" /> },
                     { id: 'ops2026', label: '2026年運營', icon: <Calendar className="w-4 h-4 mr-2" /> },
                     { id: 'visitor_stats', label: '遊客統計', icon: <Users className="w-4 h-4 mr-2" /> }
                 ].map(tab => (
@@ -858,6 +959,120 @@ export default function DashboardView({ transactions }: DashboardViewProps) {
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Reconciliation Tab */}
+            {activeTab === 'reconciliation' && (
+                <div className="space-y-6 animate-in fade-in duration-500">
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">對帳中心</h3>
+                                <p className="text-sm text-slate-500">比對系統發票與平台交易數據 (依金額及時間自動匹配)</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <select className="bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option>一般信用卡</option>
+                                </select>
+                                <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm font-medium cursor-pointer hover:bg-blue-700 transition-colors">
+                                    <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handlePlatformUpload} />
+                                    <CloudRain className="w-4 h-4" />
+                                    <span>上傳平台數據</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {!platformData.length ? (
+                            <div className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                                <div className="p-4 bg-white rounded-full shadow-sm mb-4">
+                                    <CreditCard className="w-10 h-10 text-slate-300" />
+                                </div>
+                                <h4 className="text-slate-600 font-medium mb-1">尚未上傳平台數據</h4>
+                                <p className="text-slate-400 text-sm mb-6">請上傳藍新金流或其他平台的交易報表進行自動比對</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                                <table className="w-full text-sm text-left border-collapse">
+                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-xs">
+                                        <tr>
+                                            <th className="px-4 py-3 border-r border-slate-200 bg-slate-100/50" colSpan={3}>系統發票紀錄 (左)</th>
+                                            <th className="px-4 py-3 text-center border-r border-slate-200 w-24">對帳狀態</th>
+                                            <th className="px-4 py-3 bg-slate-100/50" colSpan={3}>平台交易數據 (右)</th>
+                                        </tr>
+                                        <tr className="bg-slate-50/80 border-b border-slate-200">
+                                            <th className="px-4 py-2 font-medium">交易時間</th>
+                                            <th className="px-4 py-2 font-medium">發票號碼</th>
+                                            <th className="px-4 py-2 font-medium text-right border-r border-slate-200">金額</th>
+                                            <th className="px-4 py-2 text-center border-r border-slate-200">-</th>
+                                            <th className="px-4 py-2 font-medium">交易時間</th>
+                                            <th className="px-4 py-2 font-medium">平台序號</th>
+                                            <th className="px-4 py-2 font-medium text-right">金額</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {reconciliationMatches.map((match, idx) => {
+                                            const isMatched = match.status === 'matched';
+                                            const sys = match.system;
+                                            const plat = match.platform;
+
+                                            return (
+                                                <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${!isMatched ? 'bg-red-50/30' : ''}`}>
+                                                    {/* System Info */}
+                                                    <td className={`px-4 py-3 text-xs ${!sys ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                                        {sys ? formatDateInTaipei(sys.date) : '缺失記錄'}
+                                                    </td>
+                                                    <td className={`px-4 py-3 font-mono ${!sys ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                        {sys?.invoiceNumber || '無發票'}
+                                                    </td>
+                                                    <td className={`px-4 py-3 text-right font-mono font-medium border-r border-slate-200 ${!sys ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                        {sys ? `$${sys.amount.toLocaleString()}` : '-'}
+                                                    </td>
+
+                                                    {/* Status Icon */}
+                                                    <td className="px-4 py-3 text-center border-r border-slate-200">
+                                                        {isMatched ? (
+                                                            <div className="flex flex-col items-center">
+                                                                <CheckCircle className="w-5 h-5 text-green-500" />
+                                                                <span className="text-[10px] text-green-600 font-bold mt-1">已對齊</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex flex-col items-center">
+                                                                <AlertTriangle className="w-5 h-5 text-red-500" />
+                                                                <span className="text-[10px] text-red-600 font-bold mt-1">未匹配</span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Platform Info */}
+                                                    <td className={`px-4 py-3 text-xs ${!plat ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                                        {plat ? formatDateInTaipei(plat.date) : '缺失記錄'}
+                                                    </td>
+                                                    <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? 'text-red-500 font-bold' : 'text-slate-600'}`} title={plat?.txId}>
+                                                        {plat?.txId || '-'}
+                                                    </td>
+                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                        {plat ? `$${plat.amount.toLocaleString()}` : '-'}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {platformData.length > 0 && (
+                            <div className="mt-4 flex justify-end">
+                                <button
+                                    onClick={() => setPlatformData([])}
+                                    className="text-xs text-slate-400 hover:text-red-500 underline transition-colors"
+                                >
+                                    清除並重新上傳
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
