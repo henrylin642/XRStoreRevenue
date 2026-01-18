@@ -582,21 +582,28 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 month = ops2025Month;
             }
 
-            const prefix = `${year}-${String(month).padStart(2, '0')}`;
-            const entries = Object.entries(dailyVisitorStats);
+            // 1. Save general remarks
+            await updateSystemConfig('ops_remarks', JSON.stringify(remarks));
 
-            for (const [dateStr, count] of entries) {
-                if (dateStr.startsWith(prefix)) {
-                    // 1. Save Total Count to daily_visitor_stats (legacy compatibility)
-                    await updateDailyVisitorCount(dateStr, count);
+            // 2. Save granular data & aggregated totals
+            const daysInMonth = new Date(year, month, 0).getDate();
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
-                    // 2. Save Granular Data to system_configs
-                    const granular = granularData[dateStr] || {};
-                    const remark = remarks[dateStr] || '';
-                    const key = `ops_granular_${dateStr}`;
-                    const payload = { ...granular, remark };
-                    await updateSystemConfig(key, JSON.stringify(payload));
-                }
+                // Calculate aggregated total for this day from granular data
+                const g = granularData[dateStr] || {};
+                const attractionVisitors = Object.values(g.attractions || {}).reduce((sum: number, v: any) => sum + (Number(v) || 0), 0);
+                const privateEventVisitors = g.privateEventVisitors || 0;
+                const totalVisitors = attractionVisitors + privateEventVisitors;
+
+                // Save to legacy table for compatibility
+                await updateDailyVisitorCount(dateStr, totalVisitors);
+
+                // Save granular details
+                const remark = remarks[dateStr] || '';
+                const key = `ops_granular_${dateStr}`;
+                const payload = { ...g, remark };
+                await updateSystemConfig(key, JSON.stringify(payload));
             }
             alert('數據及備註已成功儲存！');
         } catch (e) {
@@ -1560,19 +1567,20 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                     <div key={attr} className="flex items-center justify-between gap-4 p-2 bg-slate-50 rounded border border-slate-100">
                                         <span className="text-sm text-slate-600">{attr}</span>
                                         <input
-                                            type="number"
+                                            type="text"
+                                            inputMode="numeric"
                                             value={dayAttractions[attr] || ''}
                                             onChange={(e) => {
-                                                const val = parseInt(e.target.value) || 0;
+                                                const val = e.target.value.replace(/\D/g, '');
                                                 setGranularData(prev => ({
                                                     ...prev,
                                                     [dateStr]: {
                                                         ...prev[dateStr],
-                                                        attractions: { ...dayAttractions, [attr]: val }
+                                                        attractions: { ...dayAttractions, [attr]: parseInt(val) || 0 }
                                                     }
                                                 }));
                                             }}
-                                            className="w-20 text-right bg-white border border-slate-200 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                            className="w-32 text-right bg-white border border-slate-200 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                             placeholder="0"
                                         />
                                     </div>
@@ -1589,26 +1597,34 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                     <div className="space-y-1">
                                         <label className="text-xs text-slate-400">包場收入</label>
                                         <input
-                                            type="number"
+                                            type="text"
+                                            inputMode="numeric"
                                             value={data.privateEventRevenue || ''}
-                                            onChange={(e) => setGranularData(prev => ({
-                                                ...prev,
-                                                [dateStr]: { ...prev[dateStr], privateEventRevenue: parseInt(e.target.value) || 0 }
-                                            }))}
-                                            className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none"
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                setGranularData(prev => ({
+                                                    ...prev,
+                                                    [dateStr]: { ...prev[dateStr], privateEventRevenue: parseInt(val) || 0 }
+                                                }));
+                                            }}
+                                            className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
                                             placeholder="0"
                                         />
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-xs text-slate-400">包場人次</label>
                                         <input
-                                            type="number"
+                                            type="text"
+                                            inputMode="numeric"
                                             value={data.privateEventVisitors || ''}
-                                            onChange={(e) => setGranularData(prev => ({
-                                                ...prev,
-                                                [dateStr]: { ...prev[dateStr], privateEventVisitors: parseInt(e.target.value) || 0 }
-                                            }))}
-                                            className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none"
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                setGranularData(prev => ({
+                                                    ...prev,
+                                                    [dateStr]: { ...prev[dateStr], privateEventVisitors: parseInt(val) || 0 }
+                                                }));
+                                            }}
+                                            className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
                                             placeholder="0"
                                         />
                                     </div>
