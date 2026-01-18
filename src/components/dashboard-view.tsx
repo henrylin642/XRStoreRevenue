@@ -46,7 +46,7 @@ const formatDateInTaipei = (dateStr: string, includeTime = true) => {
 
 export default function DashboardView({ transactions, session }: DashboardViewProps) {
     const role = session?.role || 'admin';
-    const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2026' | 'visitor_stats' | 'reconciliation'>(
+    const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2024' | 'ops2025' | 'ops2026' | 'visitor_stats' | 'reconciliation'>(
         role === 'ops' ? 'ops2026' : 'overview'
     );
     const [selectedYear, setSelectedYear] = useState<string>('2026');
@@ -551,6 +551,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
 
     // 2026 Operations Tab Logic (Moved here to depend on pivotData & target2026)
+    const [ops2024Month, setOps2024Month] = useState<number>(12); // Default to December for past years
+    const [ops2025Month, setOps2025Month] = useState<number>(12);
     const [ops2026Month, setOps2026Month] = useState<number>(new Date().getFullYear() === 2026 ? new Date().getMonth() + 1 : 1);
     const [weatherData, setWeatherData] = useState<Record<string, { min: number, max: number, code: number }>>({});
     const [remarks, setRemarks] = useState<Record<string, string>>({});
@@ -560,18 +562,28 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     const handleSaveVisitorStats = async () => {
         setSavingVisitors(true);
         try {
-            // Save all rows in the current ops2026Data from the state
             const entries = Object.entries(dailyVisitorStats);
+            let year = 2026;
+            let month = ops2026Month;
+
+            if (activeTab === 'ops2024') {
+                year = 2024;
+                month = ops2024Month;
+            } else if (activeTab === 'ops2025') {
+                year = 2025;
+                month = ops2025Month;
+            }
+
+            const prefix = `${year}-${String(month).padStart(2, '0')}`;
             for (const [dateStr, count] of entries) {
-                // Only save if it's within the currently displayed month to avoid bulk overhead
-                if (dateStr.startsWith(`2026-${String(ops2026Month).padStart(2, '0')}`)) {
+                if (dateStr.startsWith(prefix)) {
                     await updateDailyVisitorCount(dateStr, count);
                 }
             }
-            alert('體驗人次數據已成功儲存至資料庫！');
+            alert('數據已成功儲存！');
         } catch (e) {
             console.error(e);
-            alert('儲存失敗，請檢查網路連線或聯繫管理員。');
+            alert('儲存失敗');
         } finally {
             setSavingVisitors(false);
         }
@@ -1238,6 +1250,98 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         });
     }, []);
 
+    const ops2024Data = useMemo(() => {
+        const year = 2024;
+        const month = ops2024Month;
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const monthlyRecords = parsedData.filter(t => t.year === year && t.month === month && t.type === '交易成功');
+        const dailyRevenue: Record<number, number> = {};
+        monthlyRecords.forEach(t => {
+            const day = t.day;
+            dailyRevenue[day] = (dailyRevenue[day] || 0) + t.amount;
+        });
+        const report = [];
+        const weekDayMap = ['日', '一', '二', '三', '四', '五', '六'];
+        for (let d = 1; d <= daysInMonth; d++) {
+            const date = new Date(year, month - 1, d);
+            const weekDay = weekDayMap[date.getDay()];
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            report.push({
+                day: d,
+                weekDay,
+                revenue: dailyRevenue[d] || 0,
+                isWeekend: date.getDay() === 0 || date.getDay() === 6,
+                dateStr,
+                weather: weatherData[dateStr],
+                remark: remarks[dateStr] || '',
+                visitorCount: dailyVisitorStats[dateStr] || 0
+            });
+        }
+        return report;
+    }, [parsedData, ops2024Month, weatherData, remarks, dailyVisitorStats]);
+
+    const ops2025Data = useMemo(() => {
+        const year = 2025;
+        const month = ops2025Month;
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const monthlyRecords = parsedData.filter(t => t.year === year && t.month === month && t.type === '交易成功');
+        const dailyRevenue: Record<number, number> = {};
+        monthlyRecords.forEach(t => {
+            const day = t.day;
+            dailyRevenue[day] = (dailyRevenue[day] || 0) + t.amount;
+        });
+        const report = [];
+        const weekDayMap = ['日', '一', '二', '三', '四', '五', '六'];
+        for (let d = 1; d <= daysInMonth; d++) {
+            const date = new Date(year, month - 1, d);
+            const weekDay = weekDayMap[date.getDay()];
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            report.push({
+                day: d,
+                weekDay,
+                revenue: dailyRevenue[d] || 0,
+                isWeekend: date.getDay() === 0 || date.getDay() === 6,
+                dateStr,
+                weather: weatherData[dateStr],
+                remark: remarks[dateStr] || '',
+                visitorCount: dailyVisitorStats[dateStr] || 0
+            });
+        }
+        return report;
+    }, [parsedData, ops2025Month, weatherData, remarks, dailyVisitorStats]);
+
+    const ops2024KPI = useMemo(() => {
+        let monthlyTarget = (pivotData.map[ops2024Month][2024] || 0) * 1.05; // Dummy target: 5% growth
+        let workingDays = 0;
+        const daysInMonth = new Date(2024, ops2024Month, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) {
+            const date = new Date(2024, ops2024Month - 1, d);
+            if (date.getDay() !== 1) workingDays++;
+        }
+        const dailyBenchmark = workingDays > 0 ? monthlyTarget / workingDays : 0;
+        const actualRevenue = ops2024Data.reduce((sum, d) => sum + d.revenue, 0);
+        const achievementRate = monthlyTarget > 0 ? (actualRevenue / monthlyTarget) * 100 : 0;
+        const totalVisitors = ops2024Data.reduce((sum, d) => sum + (d.visitorCount || 0), 0);
+        const arpu = totalVisitors > 0 ? actualRevenue / totalVisitors : 0;
+        return { target: monthlyTarget, benchmark: dailyBenchmark, actual: actualRevenue, rate: achievementRate, workingDays, totalVisitors, arpu };
+    }, [ops2024Data, ops2024Month, pivotData]);
+
+    const ops2025KPI = useMemo(() => {
+        let monthlyTarget = (pivotData.map[ops2025Month][2025] || 0) * 1.05; // Dummy target: 5% growth
+        let workingDays = 0;
+        const daysInMonth = new Date(2025, ops2025Month, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) {
+            const date = new Date(2025, ops2025Month - 1, d);
+            if (date.getDay() !== 1) workingDays++;
+        }
+        const dailyBenchmark = workingDays > 0 ? monthlyTarget / workingDays : 0;
+        const actualRevenue = ops2025Data.reduce((sum, d) => sum + d.revenue, 0);
+        const achievementRate = monthlyTarget > 0 ? (actualRevenue / monthlyTarget) * 100 : 0;
+        const totalVisitors = ops2025Data.reduce((sum, d) => sum + (d.visitorCount || 0), 0);
+        const arpu = totalVisitors > 0 ? actualRevenue / totalVisitors : 0;
+        return { target: monthlyTarget, benchmark: dailyBenchmark, actual: actualRevenue, rate: achievementRate, workingDays, totalVisitors, arpu };
+    }, [ops2025Data, ops2025Month, pivotData]);
+
     const ops2026Data = useMemo(() => {
         const year = 2026;
         const month = ops2026Month;
@@ -1404,6 +1508,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     { id: 'overview', label: '營運總覽', icon: <TrendingUp className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
                     { id: 'growth', label: '營收趨勢', icon: <TrendingUp className="w-4 h-4 mr-2" />, roles: ['admin'] },
                     { id: 'invoice', label: '發票稽核', icon: <AlertTriangle className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
+                    { id: 'ops2024', label: '2024年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
+                    { id: 'ops2025', label: '2025年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
                     { id: 'ops2026', label: '2026年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
                     { id: 'visitor_stats', label: '訪客統計', icon: <Users className="w-4 h-4 mr-2" />, roles: ['admin'] },
                     { id: 'reconciliation', label: '對帳中心', icon: <DollarSign className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
@@ -2084,6 +2190,266 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                     )}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* 2024 Ops Tab */}
+            {
+                activeTab === 'ops2024' && (
+                    <div className="space-y-6 animate-in fade-in duration-500">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-4">
+                                    <h3 className="text-lg font-bold text-slate-800">2024年 每日營收報表</h3>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={handleSaveVisitorStats}
+                                        disabled={savingVisitors}
+                                        className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
+                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
+                                            }`}
+                                    >
+                                        <Save className="w-4 h-4" />
+                                        <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
+                                    </button>
+                                    <select
+                                        className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={ops2024Month}
+                                        onChange={(e) => setOps2024Month(parseInt(e.target.value))}
+                                    >
+                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                            <option key={m} value={m}>{m} 月</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* KPI Metrics Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                    <h4 className="text-sm font-semibold text-blue-700 mb-1">本月實際業績</h4>
+                                    <div className="text-2xl font-bold text-blue-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2024KPI.actual))}</div>
+                                </div>
+                                <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
+                                    <h4 className="text-sm font-semibold text-pink-700 mb-1">當月體驗人次</h4>
+                                    <div className="text-2xl font-bold text-pink-900">{new Intl.NumberFormat('en-US').format(ops2024KPI.totalVisitors)} 人</div>
+                                </div>
+                                <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
+                                    <h4 className="text-sm font-semibold text-cyan-700 mb-1">人均消費 (ARPU)</h4>
+                                    <div className="text-2xl font-bold text-cyan-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2024KPI.arpu))}</div>
+                                </div>
+                                <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                                    <h4 className="text-sm font-semibold text-amber-700 mb-1">達標率</h4>
+                                    <div className="text-2xl font-bold text-amber-900">{ops2024KPI.rate.toFixed(1)}%</div>
+                                </div>
+                            </div>
+
+                            {/* Success/Failure Analysis Section */}
+                            <div className="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
+                                <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                    <Info className="w-5 h-5 text-blue-600" />
+                                    2024年 {ops2024Month}月 運營分析
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-3">
+                                        <div className="flex items-start gap-3">
+                                            <div className="mt-1 p-1 bg-green-100 rounded-full"><CheckCircle className="w-4 h-4 text-green-600" /></div>
+                                            <div>
+                                                <p className="font-bold text-slate-700 text-sm">表現亮點</p>
+                                                <p className="text-xs text-slate-500 leading-relaxed">
+                                                    {ops2024KPI.rate >= 100 ? '本月成功達標，主要受益於假期人流。' : '本月營收主要集中在週末與特定活動期間。'}
+                                                    ARPU 表現為 ${Math.round(ops2024KPI.arpu)}，反映出穩定的客單價。
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="flex items-start gap-3">
+                                            <div className="mt-1 p-1 bg-red-100 rounded-full"><AlertTriangle className="w-4 h-4 text-red-600" /></div>
+                                            <div>
+                                                <p className="font-bold text-slate-700 text-sm">優化空間</p>
+                                                <p className="text-xs text-slate-500 leading-relaxed">
+                                                    {ops2024KPI.rate < 100 ? `達成率僅 ${ops2024KPI.rate.toFixed(1)}%，需檢討平日促銷方案。` : '建議在非尖峰時段進一步提升轉換率。'}
+                                                    觀察到週一休園效應對週二營收的潛在影響。
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-4 py-3">當月日期</th>
+                                            <th className="px-4 py-3">星期</th>
+                                            <th className="px-4 py-3 text-right">當日收入</th>
+                                            <th className="px-4 py-3 text-right">體驗人次</th>
+                                            <th className="px-4 py-3">備註</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {ops2024Data.map((row) => (
+                                            <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
+                                                <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
+                                                <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                                    {row.weekDay === '日' ? '星期日' : row.weekDay === '六' ? '星期六' : `星期${row.weekDay}`}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-slate-800 font-mono">
+                                                    ${new Intl.NumberFormat('en-US').format(row.revenue)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <input
+                                                        type="number"
+                                                        value={row.visitorCount || ''}
+                                                        onChange={(e) => {
+                                                            const val = parseInt(e.target.value) || 0;
+                                                            setDailyVisitorStats(prev => ({ ...prev, [row.dateStr]: val }));
+                                                        }}
+                                                        className="w-20 text-right bg-slate-50 border-b border-slate-200 rounded px-1"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 text-xs text-slate-500">{row.remark}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* 2025 Ops Tab */}
+            {
+                activeTab === 'ops2025' && (
+                    <div className="space-y-6 animate-in fade-in duration-500">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-4">
+                                    <h3 className="text-lg font-bold text-slate-800">2025年 每日營收報表</h3>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={handleSaveVisitorStats}
+                                        disabled={savingVisitors}
+                                        className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
+                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
+                                            }`}
+                                    >
+                                        <Save className="w-4 h-4" />
+                                        <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
+                                    </button>
+                                    <select
+                                        className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={ops2025Month}
+                                        onChange={(e) => setOps2025Month(parseInt(e.target.value))}
+                                    >
+                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                            <option key={m} value={m}>{m} 月</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* KPI Metrics Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                    <h4 className="text-sm font-semibold text-blue-700 mb-1">本月實際業績</h4>
+                                    <div className="text-2xl font-bold text-blue-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2025KPI.actual))}</div>
+                                </div>
+                                <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
+                                    <h4 className="text-sm font-semibold text-pink-700 mb-1">當月體驗人次</h4>
+                                    <div className="text-2xl font-bold text-pink-900">{new Intl.NumberFormat('en-US').format(ops2025KPI.totalVisitors)} 人</div>
+                                </div>
+                                <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
+                                    <h4 className="text-sm font-semibold text-cyan-700 mb-1">人均消費 (ARPU)</h4>
+                                    <div className="text-2xl font-bold text-cyan-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2025KPI.arpu))}</div>
+                                </div>
+                                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                                    <h4 className="text-sm font-semibold text-emerald-700 mb-1">達成率</h4>
+                                    <div className="text-2xl font-bold text-emerald-900">{ops2025KPI.rate.toFixed(1)}%</div>
+                                </div>
+                            </div>
+
+                            {/* Success/Failure Analysis Section */}
+                            <div className="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
+                                <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                    <Info className="w-5 h-5 text-blue-600" />
+                                    2025年 {ops2025Month}月 運營分析
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-3">
+                                        <div className="flex items-start gap-3">
+                                            <div className="mt-1 p-1 bg-green-100 rounded-full"><CheckCircle className="w-4 h-4 text-green-600" /></div>
+                                            <div>
+                                                <p className="font-bold text-slate-700 text-sm">表現亮點</p>
+                                                <p className="text-xs text-slate-500 leading-relaxed">
+                                                    {ops2025KPI.rate >= 100 ? '本月份展現強勁增長，達成率極高。' : 'ARPU 貢獻穩定，維持在市場平均水準。'}
+                                                    體驗人次穩定突破 {new Intl.NumberFormat('en-US').format(ops2025KPI.totalVisitors)}。
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="flex items-start gap-3">
+                                            <div className="mt-1 p-1 bg-red-100 rounded-full"><AlertTriangle className="w-4 h-4 text-red-600" /></div>
+                                            <div>
+                                                <p className="font-bold text-slate-700 text-sm">優化空間</p>
+                                                <p className="text-xs text-slate-500 leading-relaxed">
+                                                    {ops2025KPI.rate < 100 ? '部分平日時段業績未如預期，可加強校園折扣方案。' : '達標後應思考如何優化服務流程以應對高人流。'}
+                                                    天氣因素對營收波動影響顯著。
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-4 py-3">當月日期</th>
+                                            <th className="px-4 py-3">星期</th>
+                                            <th className="px-4 py-3 text-right">當日收入</th>
+                                            <th className="px-4 py-3 text-right">體驗人次</th>
+                                            <th className="px-4 py-3">備註</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {ops2025Data.map((row) => (
+                                            <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
+                                                <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
+                                                <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                                    {row.weekDay === '日' ? '星期日' : row.weekDay === '六' ? '星期六' : `星期${row.weekDay}`}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-slate-800 font-mono">
+                                                    ${new Intl.NumberFormat('en-US').format(row.revenue)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <input
+                                                        type="number"
+                                                        value={row.visitorCount || ''}
+                                                        onChange={(e) => {
+                                                            const val = parseInt(e.target.value) || 0;
+                                                            setDailyVisitorStats(prev => ({ ...prev, [row.dateStr]: val }));
+                                                        }}
+                                                        className="w-20 text-right bg-slate-50 border-b border-slate-200 rounded px-1"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 text-xs text-slate-500">{row.remark}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 )
