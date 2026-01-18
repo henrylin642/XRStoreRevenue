@@ -15,6 +15,7 @@ import * as XLSX from 'xlsx';
 import { getVisitorStats, getDailyVisitorStats } from '@/lib/visitor-data';
 import { HOLIDAY_DATA_2026, getDailyRemark, isPublicHoliday } from '@/lib/holiday-data-2026';
 import { updateDailyVisitorCount } from '@/app/actions/visitor-actions';
+import { getSystemConfig, updateSystemConfig } from '@/app/actions/config-actions';
 
 interface DashboardViewProps {
     transactions: Transaction[];
@@ -438,8 +439,35 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         return { map, years };
     }, [allValidTransactions]);
 
-    // 2026 Target State
     const [target2026, setTarget2026] = useState<number>(5600000);
+    const [isSavingTarget, setIsSavingTarget] = useState(false);
+    const [isFirstLoad, setIsFirstLoad] = useState(true);
+
+    const handleSaveTarget = async (val: number) => {
+        setIsSavingTarget(true);
+        try {
+            await updateSystemConfig('target_2026', val);
+            // Optionally show a subtle success indicator instead of alert for auto-save
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSavingTarget(false);
+        }
+    };
+
+    // Auto-save logic (Debounced)
+    useEffect(() => {
+        if (isFirstLoad) {
+            setIsFirstLoad(false);
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            handleSaveTarget(target2026);
+        }, 1000); // Wait for 1 second of inactivity
+
+        return () => clearTimeout(timer);
+    }, [target2026]);
 
     const yearPivotData = useMemo(() => {
         // Calculate Total 2025 Revenue first to determine proportions
@@ -1175,6 +1203,17 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         getDailyVisitorStats(2026, ops2026Month).then(setDailyVisitorStats);
     }, [activeTab, ops2026Month]);
 
+    useEffect(() => {
+        // Initial fetch of target configuration
+        getSystemConfig('target_2026', 5600000).then(val => {
+            if (val) {
+                setTarget2026(Number(val));
+                // Set first load to true again after fetching to prevent immediate re-save
+                setTimeout(() => setIsFirstLoad(true), 0);
+            }
+        });
+    }, []);
+
     const ops2026Data = useMemo(() => {
         const year = 2026;
         const month = ops2026Month;
@@ -1756,14 +1795,34 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 </div>
                                 <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
                                     <span className="text-sm font-semibold text-slate-700">2026 年度目標營業額:</span>
-                                    <div className="relative">
+                                    <div className="flex items-center gap-2 relative">
                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
                                         <input
-                                            type="number"
-                                            value={target2026}
-                                            onChange={(e) => setTarget2026(Math.max(0, parseInt(e.target.value) || 0))}
+                                            type="text"
+                                            value={target2026.toLocaleString()}
+                                            onChange={(e) => {
+                                                const rawValue = e.target.value.replace(/,/g, '');
+                                                const numValue = parseInt(rawValue) || 0;
+                                                setTarget2026(Math.max(0, numValue));
+                                            }}
                                             className="pl-6 pr-3 py-1.5 w-32 md:w-40 border border-slate-300 rounded-lg text-right font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                         />
+                                    </div>
+                                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${isSavingTarget
+                                        ? 'text-blue-600 bg-blue-50 animate-pulse'
+                                        : 'text-slate-400 bg-slate-100'
+                                        }`}>
+                                        {isSavingTarget ? (
+                                            <>
+                                                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" />
+                                                自動儲存中...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle className="w-3 h-3 text-green-500" />
+                                                已自動儲存
+                                            </>
+                                        )}
                                     </div>
                                     <span className="text-xs text-slate-500 hidden md:inline">(依 2025 比例自動分配)</span>
                                 </div>
