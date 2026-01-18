@@ -1542,158 +1542,16 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         };
     }, [pivotData, target2026, ops2026Month, ops2026Data]);
 
-    const GranularEntryModal = () => {
-        if (!editingGranularDate) return null;
-        const dateStr = editingGranularDate;
-        const data = granularData[dateStr] || {};
-        const dayAttractions = data.attractions || {};
-
-        return (
-            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
-                    <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
-                        <h3 className="font-bold">{dateStr} 細節輸入</h3>
-                        <button onClick={() => setEditingGranularDate(null)} className="hover:bg-white/20 p-1 rounded">
-                            <X className="w-5 h-5" />
-                        </button>
-                    </div>
-                    <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-                        <div className="space-y-3">
-                            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                <Gamepad2 className="w-4 h-4 text-blue-500" /> 遊戲項目體驗人次
-                            </h4>
-                            <div className="grid grid-cols-1 gap-2">
-                                {attractions.map(attr => (
-                                    <div key={attr} className="flex items-center justify-between gap-4 p-2 bg-slate-50 rounded border border-slate-100">
-                                        <span className="text-sm text-slate-600">{attr}</span>
-                                        <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            value={dayAttractions[attr] || ''}
-                                            onChange={(e) => {
-                                                const val = e.target.value.replace(/\D/g, '');
-                                                setGranularData(prev => ({
-                                                    ...prev,
-                                                    [dateStr]: {
-                                                        ...prev[dateStr],
-                                                        attractions: { ...dayAttractions, [attr]: parseInt(val) || 0 }
-                                                    }
-                                                }));
-                                            }}
-                                            className="w-32 text-right bg-white border border-slate-200 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                            placeholder="0"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="space-y-4 pt-4 border-t border-slate-100">
-                            <div className="space-y-2">
-                                <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                    <Users className="w-4 h-4 text-purple-500" /> 包場數據
-                                </h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-xs text-slate-400">包場收入</label>
-                                        <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            value={data.privateEventRevenue || ''}
-                                            onChange={(e) => {
-                                                const val = e.target.value.replace(/\D/g, '');
-                                                setGranularData(prev => ({
-                                                    ...prev,
-                                                    [dateStr]: { ...prev[dateStr], privateEventRevenue: parseInt(val) || 0 }
-                                                }));
-                                            }}
-                                            className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
-                                            placeholder="0"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-xs text-slate-400">包場人次</label>
-                                        <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            value={data.privateEventVisitors || ''}
-                                            onChange={(e) => {
-                                                const val = e.target.value.replace(/\D/g, '');
-                                                setGranularData(prev => ({
-                                                    ...prev,
-                                                    [dateStr]: { ...prev[dateStr], privateEventVisitors: parseInt(val) || 0 }
-                                                }));
-                                            }}
-                                            className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
-                                            placeholder="0"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3">
-                        <button onClick={() => setEditingGranularDate(null)} className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-200 rounded-lg">
-                            確定
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    const AttractionManager = () => {
-        const [newItem, setNewItem] = useState('');
-        return (
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4 mb-6">
-                <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                        <Settings className="w-4 h-4" /> 遊戲項目管理
-                    </h3>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    {attractions.map(a => (
-                        <div key={a} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm group">
-                            {a}
-                            <button onClick={() => {
-                                const newList = attractions.filter(i => i !== a);
-                                setAttractions(newList);
-                                updateSystemConfig('ops_attractions', JSON.stringify(newList));
-                            }} className="hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Trash2 className="w-3 h-3" />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-                <div className="flex gap-2">
-                    <input
-                        type="text"
-                        value={newItem}
-                        onChange={(e) => setNewItem(e.target.value)}
-                        className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="新增項目..."
-                    />
-                    <button
-                        onClick={() => {
-                            if (newItem) {
-                                const newList = [...attractions, newItem];
-                                setAttractions(newList);
-                                updateSystemConfig('ops_attractions', JSON.stringify(newList));
-                                setNewItem('');
-                            }
-                        }}
-                        className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
-                    >
-                        <Plus className="w-4 h-4" />
-                    </button>
-                </div>
-            </div>
-        );
-    };
 
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6">
-            <GranularEntryModal />
+            <GranularEntryModal
+                editingGranularDate={editingGranularDate}
+                setEditingGranularDate={setEditingGranularDate}
+                granularData={granularData}
+                setGranularData={setGranularData}
+                attractions={attractions}
+            />
             <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                 <div className="flex items-center gap-3">
                     <div className="bg-blue-600 p-2 rounded-lg">
@@ -2461,7 +2319,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             {
                 activeTab === 'ops2024' && (
                     <div className="space-y-6 animate-in fade-in duration-500">
-                        <AttractionManager />
+                        <AttractionManager
+                            attractions={attractions}
+                            setAttractions={setAttractions}
+                            updateSystemConfig={updateSystemConfig}
+                        />
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-4">
@@ -2615,7 +2477,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             {
                 activeTab === 'ops2025' && (
                     <div className="space-y-6 animate-in fade-in duration-500">
-                        <AttractionManager />
+                        <AttractionManager
+                            attractions={attractions}
+                            setAttractions={setAttractions}
+                            updateSystemConfig={updateSystemConfig}
+                        />
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-4">
@@ -2769,7 +2635,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             {
                 activeTab === 'ops2026' && (
                     <div className="space-y-6 animate-in fade-in duration-500">
-                        <AttractionManager />
+                        <AttractionManager
+                            attractions={attractions}
+                            setAttractions={setAttractions}
+                            updateSystemConfig={updateSystemConfig}
+                        />
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-4">
@@ -3030,8 +2900,179 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     </div>
                 )
             }
-        </div >
-    )
+        </div>
+    );
+}
+
+// --- Sub-Components ---
+
+function GranularEntryModal({
+    editingGranularDate,
+    setEditingGranularDate,
+    granularData,
+    setGranularData,
+    attractions
+}: {
+    editingGranularDate: string | null;
+    setEditingGranularDate: (val: string | null) => void;
+    granularData: any;
+    setGranularData: (val: any | ((prev: any) => any)) => void;
+    attractions: string[];
+}) {
+    if (!editingGranularDate) return null;
+    const dateStr = editingGranularDate;
+    const data = granularData[dateStr] || {};
+    const dayAttractions = data.attractions || {};
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+                <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
+                    <h3 className="font-bold">{dateStr} 細節輸入</h3>
+                    <button onClick={() => setEditingGranularDate(null)} className="hover:bg-white/20 p-1 rounded">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                    <div className="space-y-3">
+                        <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                            <Gamepad2 className="w-4 h-4 text-blue-500" /> 遊戲項目體驗人次
+                        </h4>
+                        <div className="grid grid-cols-1 gap-2">
+                            {attractions.map(attr => (
+                                <div key={attr} className="flex items-center justify-between gap-4 p-2 bg-slate-50 rounded border border-slate-100">
+                                    <span className="text-sm text-slate-600">{attr}</span>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={dayAttractions[attr] || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/\D/g, '');
+                                            setGranularData((prev: any) => ({
+                                                ...prev,
+                                                [dateStr]: {
+                                                    ...prev[dateStr],
+                                                    attractions: { ...dayAttractions, [attr]: parseInt(val) || 0 }
+                                                }
+                                            }));
+                                        }}
+                                        className="w-32 text-right bg-white border border-slate-200 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="0"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                        <div className="space-y-2">
+                            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                <Users className="w-4 h-4 text-purple-500" /> 包場數據
+                            </h4>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs text-slate-400">包場收入</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={data.privateEventRevenue || ''}
+                                        onChange={(e: any) => {
+                                            const val = e.target.value.replace(/\D/g, '');
+                                            setGranularData((prev: any) => ({
+                                                ...prev,
+                                                [dateStr]: { ...prev[dateStr], privateEventRevenue: parseInt(val) || 0 }
+                                            }));
+                                        }}
+                                        className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs text-slate-400">包場人次</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={data.privateEventVisitors || ''}
+                                        onChange={(e: any) => {
+                                            const val = e.target.value.replace(/\D/g, '');
+                                            setGranularData((prev: any) => ({
+                                                ...prev,
+                                                [dateStr]: { ...prev[dateStr], privateEventVisitors: parseInt(val) || 0 }
+                                            }));
+                                        }}
+                                        className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
+                                        placeholder="0"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3">
+                    <button onClick={() => setEditingGranularDate(null)} className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-200 rounded-lg">
+                        確定
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function AttractionManager({
+    attractions,
+    setAttractions,
+    updateSystemConfig
+}: {
+    attractions: string[];
+    setAttractions: (val: string[]) => void;
+    updateSystemConfig: (key: string, val: string) => Promise<any>;
+}) {
+    const [newItem, setNewItem] = useState('');
+    return (
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4 mb-6">
+            <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                    <Settings className="w-4 h-4" /> 遊戲項目管理
+                </h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+                {attractions.map(a => (
+                    <div key={a} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm group">
+                        {a}
+                        <button onClick={() => {
+                            const newList = attractions.filter(i => i !== a);
+                            setAttractions(newList);
+                            updateSystemConfig('ops_attractions', JSON.stringify(newList));
+                        }} className="hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Trash2 className="w-3 h-3" />
+                        </button>
+                    </div>
+                ))}
+            </div>
+            <div className="flex gap-2">
+                <input
+                    type="text"
+                    value={newItem}
+                    onChange={(e) => setNewItem(e.target.value)}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="新增項目..."
+                />
+                <button
+                    onClick={() => {
+                        if (newItem) {
+                            const newList = [...attractions, newItem];
+                            setAttractions(newList);
+                            updateSystemConfig('ops_attractions', JSON.stringify(newList));
+                            setNewItem('');
+                        }
+                    }}
+                    className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
+                >
+                    <Plus className="w-4 h-4" />
+                </button>
+            </div>
+        </div>
+    );
 }
 
 function InvoiceTablePagination({ data, refundSet }: { data: any[], refundSet: Set<string> }) {
@@ -3039,20 +3080,12 @@ function InvoiceTablePagination({ data, refundSet }: { data: any[], refundSet: S
     const pageSize = 50;
     const totalPages = Math.ceil(data.length / pageSize);
 
-    // Reset page when data changes
     useEffect(() => {
         setPage(1);
     }, [data.length]);
 
     const currentData = useMemo(() => {
-        // Sort by Invoice Number if available, else Date
         const sorted = [...data].sort((a, b) => {
-            // Put missing invoices at the top? Or just standard sort?
-            // User requested standard sort usually, but let's stick to Date DESC as per main logic,
-            // OR Invoice Number desc.
-            // The main logic sorts by Date DESC. 
-            // The local currentData here sorts by Invoice Number.
-            // Let's keep Invoice Number sort for consistency with "list" view grouping
             const numA = a.invoiceNumber || '';
             const numB = b.invoiceNumber || '';
             if (numA === numB) return new Date(b.date).getTime() - new Date(a.date).getTime();
@@ -3064,18 +3097,12 @@ function InvoiceTablePagination({ data, refundSet }: { data: any[], refundSet: S
 
     return (
         <>
-            {/* Need to update header in parent or here? The parent defines the <thead>. 
-                We should technically update the parent component's <thead> to match columns.
-                But `InvoiceTablePagination` only renders <tr>. 
-                Wait, I need to update the <thead> in `DashboardView` as well!
-                It was at lines 924-929.
-            */}
             {currentData.map((t, idx) => {
                 const hasInvoice = t.invoiceNumber && t.invoiceNumber.trim() !== '' && t.invoiceNumber !== '-';
                 const isRefund = hasInvoice && refundSet.has(t.invoiceNumber);
                 const invoiceStyle = hasInvoice
                     ? 'font-mono text-slate-700 font-medium group-hover:text-blue-600'
-                    : 'text-red-500 font-bold'; // Red for missing invoice
+                    : 'text-red-500 font-bold';
 
                 let remark = '';
                 if (!hasInvoice) remark = '無發票記錄';
@@ -3157,7 +3184,7 @@ function UploadButton() {
             const data = await res.json();
             if (data.success) {
                 alert(data.message);
-                window.location.reload(); // Reload to fetch new data
+                window.location.reload();
             } else {
                 alert('上傳失敗: ' + data.error);
             }
@@ -3166,7 +3193,6 @@ function UploadButton() {
             alert('上傳發生錯誤');
         } finally {
             setUploading(false);
-            // Clear input
             e.target.value = '';
         }
     };
@@ -3194,7 +3220,6 @@ function UploadButton() {
         </label>
     );
 }
-
 
 function Card({ title, value, sub, icon, trend }: any) {
     return (
