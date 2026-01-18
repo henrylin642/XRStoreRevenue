@@ -1446,17 +1446,10 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             tickFormatter={(val) => `$${(val / 1000).toLocaleString()}k`}
                                             label={{ value: '營收', angle: -90, position: 'insideLeft' }}
                                         />
-                                        <YAxis
-                                            yAxisId="right"
-                                            orientation="right"
-                                            tickFormatter={(val) => `$${val.toLocaleString()}`}
-                                            label={{ value: '平均客單價 (ATV)', angle: 90, position: 'insideRight' }}
-                                        />
                                         <Tooltip
                                             formatter={(val: number | string | Array<number | string> | undefined, name: string | undefined) => {
                                                 if (name === 'count') return [`${val} 筆`, '交易筆數'];
                                                 if (name === 'revenue') return [`$${(val as number).toLocaleString()}`, '營收'];
-                                                if (name === 'atv') return [`$${(val as number).toLocaleString()}`, '平均客單價'];
                                                 return val;
                                             }}
                                             labelFormatter={(label) => `時間: ${label}`}
@@ -1467,7 +1460,6 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                 <Cell key={`cell-${index}`} fill={entry.isHighlight ? '#ef4444' : '#3b82f6'} />
                                             ))}
                                         </Bar>
-                                        <Line yAxisId="right" type="monotone" dataKey="atv" stroke="#ff7300" name="平均客單價" strokeWidth={2} dot={{ r: 3 }} />
                                     </ComposedChart>
                                 </ResponsiveContainer>
                             </div>
