@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-    LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, ComposedChart
+    LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, ReferenceLine, Label
 } from 'recharts';
 import { Transaction } from '@/lib/data-manager';
 import {
@@ -524,6 +524,30 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         }
         return Math.round(target);
     }, [selectedYear, selectedMonth, target2026, yearPivotData]);
+
+    const currentMonthlyTarget = useMemo(() => {
+        if (selectedMonth === 'All') return target2026 / 12;
+        const m = parseInt(selectedMonth);
+        const row = yearPivotData.find(r => r.month === m);
+        return row ? row.target2026 : target2026 / 12;
+    }, [selectedMonth, yearPivotData, target2026]);
+
+    const beValue = useMemo(() => {
+        const FIXED_COST = 300000;
+        const WORKING_DAYS = 25;
+        const dailyBE = FIXED_COST / WORKING_DAYS;
+        if (granularity === 'day') return dailyBE;
+        if (granularity === 'week') return dailyBE * (WORKING_DAYS / 4.345);
+        return FIXED_COST;
+    }, [granularity]);
+
+    const chartTargetValue = useMemo(() => {
+        const WORKING_DAYS = 25;
+        const dailyTarget = currentMonthlyTarget / WORKING_DAYS;
+        if (granularity === 'day') return dailyTarget;
+        if (granularity === 'week') return dailyTarget * (WORKING_DAYS / 4.345);
+        return currentMonthlyTarget;
+    }, [granularity, currentMonthlyTarget]);
 
 
     // 2026 Operations Tab Logic (Moved here to depend on pivotData & target2026)
@@ -1445,6 +1469,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             yAxisId="left"
                                             tickFormatter={(val) => `$${(val / 1000).toLocaleString()}k`}
                                             label={{ value: '營收', angle: -90, position: 'insideLeft' }}
+                                            domain={[0, (dataMax: number) => Math.max(dataMax, beValue * 1.2, chartTargetValue * 1.2)]}
                                         />
                                         <Tooltip
                                             formatter={(val: number | string | Array<number | string> | undefined, name: string | undefined) => {
@@ -1460,6 +1485,12 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                 <Cell key={`cell-${index}`} fill={entry.isHighlight ? '#ef4444' : '#3b82f6'} />
                                             ))}
                                         </Bar>
+                                        <ReferenceLine yAxisId="left" y={beValue} stroke="#ef4444" strokeDasharray="3 3">
+                                            <Label value="損益兩平線" position="insideTopLeft" fill="#ef4444" fontSize={10} offset={5} />
+                                        </ReferenceLine>
+                                        <ReferenceLine yAxisId="left" y={chartTargetValue} stroke="#10b981" strokeDasharray="3 3">
+                                            <Label value="目標業績線" position="insideTopLeft" fill="#10b981" fontSize={10} offset={5} />
+                                        </ReferenceLine>
                                     </ComposedChart>
                                 </ResponsiveContainer>
                             </div>
