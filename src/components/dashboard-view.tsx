@@ -9,7 +9,7 @@ import { Transaction } from '@/lib/data-manager';
 import {
     CloudRain, CreditCard, Ticket, DollarSign, Calendar, TrendingUp, AlertTriangle, CheckCircle, Users,
     Thermometer, Sun, Cloud, CloudSnow, CloudLightning, FileText, Smartphone as SmartphoneIcon,
-    Info, Trash2, X, Printer, LogOut, Save
+    Info, Trash2, X, Printer, LogOut, Save, Edit3, Gamepad2, Settings, Plus, BarChart2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getVisitorStats, getDailyVisitorStats } from '@/lib/visitor-data';
@@ -556,13 +556,21 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     const [ops2026Month, setOps2026Month] = useState<number>(new Date().getFullYear() === 2026 ? new Date().getMonth() + 1 : 1);
     const [weatherData, setWeatherData] = useState<Record<string, { min: number, max: number, code: number }>>({});
     const [remarks, setRemarks] = useState<Record<string, string>>({});
+    const [granularData, setGranularData] = useState<Record<string, {
+        attractions?: Record<string, number>,
+        privateEventRevenue?: number,
+        privateEventVisitors?: number,
+        ticketRevenueOverride?: number
+    }>>({});
+    const [attractions, setAttractions] = useState<string[]>(['F1星軌飆速', '星際謎域', '星際射手', '蛋蛋大逃殺', '銀河追魂']);
+    const [isSavingGranular, setIsSavingGranular] = useState(false);
+    const [editingGranularDate, setEditingGranularDate] = useState<string | null>(null);
     const [dailyVisitorStats, setDailyVisitorStats] = useState<Record<string, number>>({});
     const [savingVisitors, setSavingVisitors] = useState(false);
 
     const handleSaveVisitorStats = async () => {
         setSavingVisitors(true);
         try {
-            const entries = Object.entries(dailyVisitorStats);
             let year = 2026;
             let month = ops2026Month;
 
@@ -575,12 +583,22 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             }
 
             const prefix = `${year}-${String(month).padStart(2, '0')}`;
+            const entries = Object.entries(dailyVisitorStats);
+
             for (const [dateStr, count] of entries) {
                 if (dateStr.startsWith(prefix)) {
+                    // 1. Save Total Count to daily_visitor_stats (legacy compatibility)
                     await updateDailyVisitorCount(dateStr, count);
+
+                    // 2. Save Granular Data to system_configs
+                    const granular = granularData[dateStr] || {};
+                    const remark = remarks[dateStr] || '';
+                    const key = `ops_granular_${dateStr}`;
+                    const payload = { ...granular, remark };
+                    await updateSystemConfig(key, JSON.stringify(payload));
                 }
             }
-            alert('數據已成功儲存！');
+            alert('數據及備註已成功儲存！');
         } catch (e) {
             console.error(e);
             alert('儲存失敗');
@@ -1240,6 +1258,48 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         getDailyVisitorStats(year, month).then(setDailyVisitorStats);
     }, [activeTab, ops2024Month, ops2025Month, ops2026Month]);
 
+    // Load Granular Data and Attractions
+    useEffect(() => {
+        getSystemConfig('ops_attractions', JSON.stringify(['F1星軌飆速', '星際謎域', '星際射手', '蛋蛋大逃殺', '銀河追魂']))
+            .then(val => {
+                if (val) setAttractions(JSON.parse(val));
+            });
+    }, []);
+
+    // Load granular data for the current active month
+    useEffect(() => {
+        let year = 0;
+        let month = 0;
+        if (activeTab === 'ops2024') { year = 2024; month = ops2024Month; }
+        else if (activeTab === 'ops2025') { year = 2025; month = ops2025Month; }
+        else if (activeTab === 'ops2026') { year = 2026; month = ops2026Month; }
+
+        if (year === 0) return;
+
+        const loadMonthData = async () => {
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const newData: Record<string, any> = {};
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const key = `ops_granular_${dateStr}`;
+                const val = await getSystemConfig(key, '');
+                if (val) {
+                    try {
+                        const parsed = JSON.parse(val);
+                        newData[dateStr] = parsed;
+                        if (parsed.remark) {
+                            setRemarks(prev => ({ ...prev, [dateStr]: parsed.remark }));
+                        }
+                    } catch (e) {
+                        console.error('Parse error for key', key, e);
+                    }
+                }
+            }
+            setGranularData(prev => ({ ...prev, ...newData }));
+        };
+        loadMonthData();
+    }, [activeTab, ops2024Month, ops2025Month, ops2026Month]);
+
     useEffect(() => {
         // Initial fetch of target configuration
         getSystemConfig('target_2026', 5600000).then(val => {
@@ -1267,21 +1327,34 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             const date = new Date(year, month - 1, d);
             const weekDay = weekDayMap[date.getDay()];
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            const visitorCount = dailyVisitorStats[dateStr] || 0;
+
+            const g = granularData[dateStr] || {};
+            const ticketRevenue = dailyRevenue[d] || 0;
+            const privateEventRevenue = g.privateEventRevenue || 0;
+            const totalRevenue = ticketRevenue + privateEventRevenue;
+
+            const attractionVisitors = Object.values(g.attractions || {}).reduce((sum: number, v: any) => sum + (Number(v) || 0), 0);
+            const privateEventVisitors = g.privateEventVisitors || 0;
+            const totalVisitors = attractionVisitors + privateEventVisitors;
+
             report.push({
                 day: d,
                 weekDay,
-                revenue: dailyRevenue[d] || 0,
+                ticketRevenue,
+                privateEventRevenue,
+                revenue: totalRevenue,
                 isWeekend: date.getDay() === 0 || date.getDay() === 6,
                 dateStr,
                 weather: weatherData[dateStr],
                 remark: remarks[dateStr] || '',
-                visitorCount,
-                dailyARPU: visitorCount > 0 ? (dailyRevenue[d] || 0) / visitorCount : 0
+                attractionVisitors,
+                privateEventVisitors,
+                visitorCount: totalVisitors,
+                dailyARPU: totalVisitors > 0 ? totalRevenue / totalVisitors : 0
             });
         }
         return report;
-    }, [parsedData, ops2024Month, weatherData, remarks, dailyVisitorStats]);
+    }, [parsedData, ops2024Month, weatherData, remarks, granularData]);
 
     const ops2025Data = useMemo(() => {
         const year = 2025;
@@ -1299,21 +1372,34 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             const date = new Date(year, month - 1, d);
             const weekDay = weekDayMap[date.getDay()];
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            const visitorCount = dailyVisitorStats[dateStr] || 0;
+
+            const g = granularData[dateStr] || {};
+            const ticketRevenue = dailyRevenue[d] || 0;
+            const privateEventRevenue = g.privateEventRevenue || 0;
+            const totalRevenue = ticketRevenue + privateEventRevenue;
+
+            const attractionVisitors = Object.values(g.attractions || {}).reduce((sum: number, v: any) => sum + (Number(v) || 0), 0);
+            const privateEventVisitors = g.privateEventVisitors || 0;
+            const totalVisitors = attractionVisitors + privateEventVisitors;
+
             report.push({
                 day: d,
                 weekDay,
-                revenue: dailyRevenue[d] || 0,
+                ticketRevenue,
+                privateEventRevenue,
+                revenue: totalRevenue,
                 isWeekend: date.getDay() === 0 || date.getDay() === 6,
                 dateStr,
                 weather: weatherData[dateStr],
                 remark: remarks[dateStr] || '',
-                visitorCount,
-                dailyARPU: visitorCount > 0 ? (dailyRevenue[d] || 0) / visitorCount : 0
+                attractionVisitors,
+                privateEventVisitors,
+                visitorCount: totalVisitors,
+                dailyARPU: totalVisitors > 0 ? totalRevenue / totalVisitors : 0
             });
         }
         return report;
-    }, [parsedData, ops2025Month, weatherData, remarks, dailyVisitorStats]);
+    }, [parsedData, ops2025Month, weatherData, remarks, granularData]);
 
     const ops2024KPI = useMemo(() => {
         let monthlyTarget = (pivotData.map[ops2024Month][2024] || 0) * 1.05; // Dummy target: 5% growth
@@ -1373,22 +1459,34 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             const weekDay = weekDayMap[date.getDay()];
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
-            const visitorCount = dailyVisitorStats[dateStr] || 0;
+            const g = granularData[dateStr] || {};
+            const ticketRevenue = dailyRevenue[d] || 0;
+            const privateEventRevenue = g.privateEventRevenue || 0;
+            const totalRevenue = ticketRevenue + privateEventRevenue;
+
+            const attractionVisitors = Object.values(g.attractions || {}).reduce((sum: number, v: any) => sum + (Number(v) || 0), 0);
+            const privateEventVisitors = g.privateEventVisitors || 0;
+            const totalVisitors = attractionVisitors + privateEventVisitors;
+
             report.push({
                 day: d,
                 weekDay,
-                revenue: dailyRevenue[d] || 0,
+                ticketRevenue,
+                privateEventRevenue,
+                revenue: totalRevenue,
                 isWeekend: date.getDay() === 0 || date.getDay() === 6,
                 dateStr,
                 weather: weatherData[dateStr],
                 remark: remarks[dateStr] || '',
-                visitorCount,
-                dailyARPU: visitorCount > 0 ? (dailyRevenue[d] || 0) / visitorCount : 0
+                attractionVisitors,
+                privateEventVisitors,
+                visitorCount: totalVisitors,
+                dailyARPU: totalVisitors > 0 ? totalRevenue / totalVisitors : 0
             });
         }
 
         return report;
-    }, [parsedData, ops2026Month, weatherData, remarks, dailyVisitorStats]);
+    }, [parsedData, ops2026Month, weatherData, remarks, granularData]);
 
     const ops2026KPI = useMemo(() => {
         // 1. Target
@@ -1437,8 +1535,149 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         };
     }, [pivotData, target2026, ops2026Month, ops2026Data]);
 
+    const GranularEntryModal = () => {
+        if (!editingGranularDate) return null;
+        const dateStr = editingGranularDate;
+        const data = granularData[dateStr] || {};
+        const dayAttractions = data.attractions || {};
+
+        return (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+                    <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
+                        <h3 className="font-bold">{dateStr} 細節輸入</h3>
+                        <button onClick={() => setEditingGranularDate(null)} className="hover:bg-white/20 p-1 rounded">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                    <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                        <div className="space-y-3">
+                            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                <Gamepad2 className="w-4 h-4 text-blue-500" /> 遊戲項目體驗人次
+                            </h4>
+                            <div className="grid grid-cols-1 gap-2">
+                                {attractions.map(attr => (
+                                    <div key={attr} className="flex items-center justify-between gap-4 p-2 bg-slate-50 rounded border border-slate-100">
+                                        <span className="text-sm text-slate-600">{attr}</span>
+                                        <input
+                                            type="number"
+                                            value={dayAttractions[attr] || ''}
+                                            onChange={(e) => {
+                                                const val = parseInt(e.target.value) || 0;
+                                                setGranularData(prev => ({
+                                                    ...prev,
+                                                    [dateStr]: {
+                                                        ...prev[dateStr],
+                                                        attractions: { ...dayAttractions, [attr]: val }
+                                                    }
+                                                }));
+                                            }}
+                                            className="w-20 text-right bg-white border border-slate-200 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 pt-4 border-t border-slate-100">
+                            <div className="space-y-2">
+                                <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-purple-500" /> 包場數據
+                                </h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs text-slate-400">包場收入</label>
+                                        <input
+                                            type="number"
+                                            value={data.privateEventRevenue || ''}
+                                            onChange={(e) => setGranularData(prev => ({
+                                                ...prev,
+                                                [dateStr]: { ...prev[dateStr], privateEventRevenue: parseInt(e.target.value) || 0 }
+                                            }))}
+                                            className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs text-slate-400">包場人次</label>
+                                        <input
+                                            type="number"
+                                            value={data.privateEventVisitors || ''}
+                                            onChange={(e) => setGranularData(prev => ({
+                                                ...prev,
+                                                [dateStr]: { ...prev[dateStr], privateEventVisitors: parseInt(e.target.value) || 0 }
+                                            }))}
+                                            className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3">
+                        <button onClick={() => setEditingGranularDate(null)} className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-200 rounded-lg">
+                            確定
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const AttractionManager = () => {
+        const [newItem, setNewItem] = useState('');
+        return (
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4 mb-6">
+                <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                        <Settings className="w-4 h-4" /> 遊戲項目管理
+                    </h3>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    {attractions.map(a => (
+                        <div key={a} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm group">
+                            {a}
+                            <button onClick={() => {
+                                const newList = attractions.filter(i => i !== a);
+                                setAttractions(newList);
+                                updateSystemConfig('ops_attractions', JSON.stringify(newList));
+                            }} className="hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Trash2 className="w-3 h-3" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+                <div className="flex gap-2">
+                    <input
+                        type="text"
+                        value={newItem}
+                        onChange={(e) => setNewItem(e.target.value)}
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="新增項目..."
+                    />
+                    <button
+                        onClick={() => {
+                            if (newItem) {
+                                const newList = [...attractions, newItem];
+                                setAttractions(newList);
+                                updateSystemConfig('ops_attractions', JSON.stringify(newList));
+                                setNewItem('');
+                            }
+                        }}
+                        className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
+                    >
+                        <Plus className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6">
+            <GranularEntryModal />
             <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                 <div className="flex items-center gap-3">
                     <div className="bg-blue-600 p-2 rounded-lg">
@@ -2206,6 +2445,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             {
                 activeTab === 'ops2024' && (
                     <div className="space-y-6 animate-in fade-in duration-500">
+                        <AttractionManager />
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-4">
@@ -2293,12 +2533,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                                         <tr>
-                                            <th className="px-4 py-3">當月日期</th>
+                                            <th className="px-4 py-3">日期</th>
                                             <th className="px-4 py-3">星期</th>
-                                            <th className="px-4 py-3">天氣 / 氣溫</th>
+                                            <th className="px-4 py-3 text-right">票務收入</th>
+                                            <th className="px-4 py-3 text-right">包場收入</th>
                                             <th className="px-4 py-3 text-right">當日收入</th>
                                             <th className="px-4 py-3 text-right">體驗人次</th>
-                                            <th className="px-4 py-3 text-right">日均客單價</th>
+                                            <th className="px-4 py-3 text-right">包場人次</th>
+                                            <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
                                             <th className="px-4 py-3">備註</th>
                                         </tr>
                                     </thead>
@@ -2307,41 +2549,31 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
                                                 <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
                                                 <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                                                    {row.weekDay === '日' ? '星期日' : row.weekDay === '六' ? '星期六' : `星期${row.weekDay}`}
+                                                    {row.weekDay}
                                                 </td>
-                                                <td className="px-4 py-3">
-                                                    {row.weather ? (
-                                                        <div className="flex items-center gap-2 text-slate-600 text-sm">
-                                                            {row.weather.code === 0 || row.weather.code === 1 ? <Sun className="w-4 h-4 text-orange-500" /> :
-                                                                row.weather.code === 2 || row.weather.code === 3 ? <Cloud className="w-4 h-4 text-slate-400" /> :
-                                                                    row.weather.code >= 51 && row.weather.code <= 67 ? <CloudRain className="w-4 h-4 text-blue-400" /> :
-                                                                        row.weather.code >= 71 && row.weather.code <= 77 ? <CloudSnow className="w-4 h-4 text-indigo-300" /> :
-                                                                            row.weather.code >= 95 ? <CloudLightning className="w-4 h-4 text-purple-500" /> :
-                                                                                <Cloud className="w-4 h-4 text-slate-400" />
-                                                            }
-                                                            <span className="font-mono text-xs">
-                                                                {row.weather.min}°C - {row.weather.max}°C
-                                                            </span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-xs text-slate-300">-</span>
-                                                    )}
+                                                <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                                                    ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
                                                 </td>
-                                                <td className="px-4 py-3 text-right text-slate-800 font-mono">
+                                                <td className="px-4 py-3 text-right text-purple-600 font-mono">
+                                                    ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
                                                     ${new Intl.NumberFormat('en-US').format(row.revenue)}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
-                                                    <input
-                                                        type="number"
-                                                        value={row.visitorCount || ''}
-                                                        onChange={(e) => {
-                                                            const val = parseInt(e.target.value) || 0;
-                                                            setDailyVisitorStats(prev => ({ ...prev, [row.dateStr]: val }));
-                                                        }}
-                                                        className="w-20 text-right bg-slate-50 border-b border-slate-200 rounded px-1"
-                                                    />
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <span className="font-bold text-blue-600">{row.visitorCount}</span>
+                                                        <button
+                                                            onClick={() => setEditingGranularDate(row.dateStr)}
+                                                            className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
+                                                            title="點擊編輯各項目明細"
+                                                        >
+                                                            <Edit3 className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-mono text-cyan-700">
+                                                <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
+                                                <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
                                                     ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
                                                 </td>
                                                 <td className="px-4 py-3">
@@ -2367,6 +2599,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             {
                 activeTab === 'ops2025' && (
                     <div className="space-y-6 animate-in fade-in duration-500">
+                        <AttractionManager />
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-4">
@@ -2454,12 +2687,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                                         <tr>
-                                            <th className="px-4 py-3">當月日期</th>
+                                            <th className="px-4 py-3">日期</th>
                                             <th className="px-4 py-3">星期</th>
-                                            <th className="px-4 py-3">天氣 / 氣溫</th>
+                                            <th className="px-4 py-3 text-right">票務收入</th>
+                                            <th className="px-4 py-3 text-right">包場收入</th>
                                             <th className="px-4 py-3 text-right">當日收入</th>
                                             <th className="px-4 py-3 text-right">體驗人次</th>
-                                            <th className="px-4 py-3 text-right">日均客單價</th>
+                                            <th className="px-4 py-3 text-right">包場人次</th>
+                                            <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
                                             <th className="px-4 py-3">備註</th>
                                         </tr>
                                     </thead>
@@ -2468,41 +2703,31 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
                                                 <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
                                                 <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                                                    {row.weekDay === '日' ? '星期日' : row.weekDay === '六' ? '星期六' : `星期${row.weekDay}`}
+                                                    {row.weekDay}
                                                 </td>
-                                                <td className="px-4 py-3">
-                                                    {row.weather ? (
-                                                        <div className="flex items-center gap-2 text-slate-600 text-sm">
-                                                            {row.weather.code === 0 || row.weather.code === 1 ? <Sun className="w-4 h-4 text-orange-500" /> :
-                                                                row.weather.code === 2 || row.weather.code === 3 ? <Cloud className="w-4 h-4 text-slate-400" /> :
-                                                                    row.weather.code >= 51 && row.weather.code <= 67 ? <CloudRain className="w-4 h-4 text-blue-400" /> :
-                                                                        row.weather.code >= 71 && row.weather.code <= 77 ? <CloudSnow className="w-4 h-4 text-indigo-300" /> :
-                                                                            row.weather.code >= 95 ? <CloudLightning className="w-4 h-4 text-purple-500" /> :
-                                                                                <Cloud className="w-4 h-4 text-slate-400" />
-                                                            }
-                                                            <span className="font-mono text-xs">
-                                                                {row.weather.min}°C - {row.weather.max}°C
-                                                            </span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-xs text-slate-300">-</span>
-                                                    )}
+                                                <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                                                    ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
                                                 </td>
-                                                <td className="px-4 py-3 text-right text-slate-800 font-mono">
+                                                <td className="px-4 py-3 text-right text-purple-600 font-mono">
+                                                    ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
                                                     ${new Intl.NumberFormat('en-US').format(row.revenue)}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
-                                                    <input
-                                                        type="number"
-                                                        value={row.visitorCount || ''}
-                                                        onChange={(e) => {
-                                                            const val = parseInt(e.target.value) || 0;
-                                                            setDailyVisitorStats(prev => ({ ...prev, [row.dateStr]: val }));
-                                                        }}
-                                                        className="w-20 text-right bg-slate-50 border-b border-slate-200 rounded px-1"
-                                                    />
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <span className="font-bold text-blue-600">{row.visitorCount}</span>
+                                                        <button
+                                                            onClick={() => setEditingGranularDate(row.dateStr)}
+                                                            className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
+                                                            title="點擊編輯各項目明細"
+                                                        >
+                                                            <Edit3 className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-mono text-cyan-700">
+                                                <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
+                                                <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
                                                     ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
                                                 </td>
                                                 <td className="px-4 py-3">
@@ -2528,6 +2753,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             {
                 activeTab === 'ops2026' && (
                     <div className="space-y-6 animate-in fade-in duration-500">
+                        <AttractionManager />
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-4">
@@ -2656,12 +2882,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                                         <tr>
-                                            <th className="px-4 py-3">當月日期</th>
+                                            <th className="px-4 py-3">日期</th>
                                             <th className="px-4 py-3">星期</th>
-                                            <th className="px-4 py-3">天氣 / 氣溫</th>
+                                            <th className="px-4 py-3 text-right">票務收入</th>
+                                            <th className="px-4 py-3 text-right">包場收入</th>
                                             <th className="px-4 py-3 text-right">當日收入</th>
                                             <th className="px-4 py-3 text-right">體驗人次</th>
-                                            <th className="px-4 py-3 text-right">日均客單價</th>
+                                            <th className="px-4 py-3 text-right">包場人次</th>
+                                            <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
                                             <th className="px-4 py-3">備註</th>
                                         </tr>
                                     </thead>
@@ -2670,45 +2898,31 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
                                                 <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
                                                 <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                                                    {row.weekDay === '日' ? '星期日' :
-                                                        row.weekDay === '六' ? '星期六' :
-                                                            `星期${row.weekDay}`}
+                                                    {row.weekDay}
                                                 </td>
-                                                <td className="px-4 py-3">
-                                                    {row.weather ? (
-                                                        <div className="flex items-center gap-2 text-slate-600 text-sm">
-                                                            {/* Simple Weather Icon Logic based on WMO code */}
-                                                            {row.weather.code === 0 || row.weather.code === 1 ? <Sun className="w-4 h-4 text-orange-500" /> :
-                                                                row.weather.code === 2 || row.weather.code === 3 ? <Cloud className="w-4 h-4 text-slate-400" /> :
-                                                                    row.weather.code >= 51 && row.weather.code <= 67 ? <CloudRain className="w-4 h-4 text-blue-400" /> :
-                                                                        row.weather.code >= 71 && row.weather.code <= 77 ? <CloudSnow className="w-4 h-4 text-indigo-300" /> :
-                                                                            row.weather.code >= 95 ? <CloudLightning className="w-4 h-4 text-purple-500" /> :
-                                                                                <Cloud className="w-4 h-4 text-slate-400" />
-                                                            }
-                                                            <span className="font-mono text-xs">
-                                                                {row.weather.min}°C - {row.weather.max}°C
-                                                            </span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-xs text-slate-300">-</span>
-                                                    )}
+                                                <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                                                    ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
                                                 </td>
-                                                <td className="px-4 py-3 text-right text-slate-800 font-mono">
+                                                <td className="px-4 py-3 text-right text-purple-600 font-mono">
+                                                    ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
                                                     ${new Intl.NumberFormat('en-US').format(row.revenue)}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
-                                                    <input
-                                                        type="number"
-                                                        value={row.visitorCount || ''}
-                                                        onChange={(e) => {
-                                                            const val = parseInt(e.target.value) || 0;
-                                                            setDailyVisitorStats(prev => ({ ...prev, [row.dateStr]: val }));
-                                                        }}
-                                                        placeholder="0"
-                                                        className="w-20 text-right bg-slate-50 border-b border-slate-200 hover:border-blue-500 focus:border-blue-600 focus:outline-none text-sm text-slate-700 transition-colors placeholder:text-slate-200 rounded px-1"
-                                                    />
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <span className="font-bold text-blue-600">{row.visitorCount}</span>
+                                                        <button
+                                                            onClick={() => setEditingGranularDate(row.dateStr)}
+                                                            className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
+                                                            title="點擊編輯各項目明細"
+                                                        >
+                                                            <Edit3 className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-mono text-cyan-700">
+                                                <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
+                                                <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
                                                     ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
                                                 </td>
                                                 <td className="px-4 py-3">
@@ -2965,26 +3179,6 @@ function UploadButton() {
     );
 }
 
-function BarChart2(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <line x1="18" x2="18" y1="20" y2="10" />
-            <line x1="12" x2="12" y1="20" y2="4" />
-            <line x1="6" x2="6" y1="20" y2="14" />
-        </svg>
-    )
-}
 
 function Card({ title, value, sub, icon, trend }: any) {
     return (
