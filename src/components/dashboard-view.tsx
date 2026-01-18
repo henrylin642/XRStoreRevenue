@@ -1147,13 +1147,20 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     }, [parsedData, platformData, reconStartDate, reconEndDate]);
 
     useEffect(() => {
-        const year = 2026;
-        const daysInMonth = new Date(year, ops2026Month, 0).getDate();
+        let year = 0;
+        let month = 0;
+        if (activeTab === 'ops2024') { year = 2024; month = ops2024Month; }
+        else if (activeTab === 'ops2025') { year = 2025; month = ops2025Month; }
+        else if (activeTab === 'ops2026') { year = 2026; month = ops2026Month; }
+
+        if (year === 0) return;
+
+        const daysInMonth = new Date(year, month, 0).getDate();
         setRemarks(prev => {
             const next = { ...prev };
             let changed = false;
             for (let d = 1; d <= daysInMonth; d++) {
-                const dateStr = `${year}-${String(ops2026Month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 if (next[dateStr] === undefined) {
                     const def = getDailyRemark(dateStr);
                     if (def) {
@@ -1164,7 +1171,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             }
             return changed ? next : prev;
         });
-    }, [ops2026Month]);
+    }, [activeTab, ops2024Month, ops2025Month, ops2026Month]);
 
     // Fetch Weather Data
     // Fetch Visitor Data
@@ -1174,11 +1181,15 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     }, []);
 
     useEffect(() => {
-        if (activeTab !== 'ops2026') return;
+        let year = 0;
+        let month = 0;
+        if (activeTab === 'ops2024') { year = 2024; month = ops2024Month; }
+        else if (activeTab === 'ops2025') { year = 2025; month = ops2025Month; }
+        else if (activeTab === 'ops2026') { year = 2026; month = ops2026Month; }
+
+        if (year === 0) return;
 
         const fetchWeather = async () => {
-            const year = 2026;
-            const month = ops2026Month;
             const today = new Date();
 
             // Can only fetch past data or forecast for near past
@@ -1192,16 +1203,6 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             // Determine end date for fetch
             let endFetchDate = endDate;
             if (today < endDate) {
-                // If current month, fetch up to yesterday (or today if API supports)
-                // Open-Meteo Archive/Forecast mix. Archive usually has 5 day lag.
-                // Let's rely on standard archive logic, might miss recent days.
-                // Actually, let's just try to fetch the whole month relative to "today"
-                // For simplicity, we just fetch what we can. 
-                // The API handles future dates by just returning nulls or forecasting if we use forecast endpoint.
-                // But user wants "past weather".
-                // Let's use the 'forecast' endpoint with 'past_days' if we want recent data, 
-                // but 'archive' is better for stability of history.
-                // Let's try archive endpoint first for simplicity.
                 endFetchDate = new Date(today);
                 endFetchDate.setDate(endFetchDate.getDate() - 1); // Yesterday
             }
@@ -1236,8 +1237,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         };
 
         fetchWeather();
-        getDailyVisitorStats(2026, ops2026Month).then(setDailyVisitorStats);
-    }, [activeTab, ops2026Month]);
+        getDailyVisitorStats(year, month).then(setDailyVisitorStats);
+    }, [activeTab, ops2024Month, ops2025Month, ops2026Month]);
 
     useEffect(() => {
         // Initial fetch of target configuration
@@ -1266,6 +1267,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             const date = new Date(year, month - 1, d);
             const weekDay = weekDayMap[date.getDay()];
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const visitorCount = dailyVisitorStats[dateStr] || 0;
             report.push({
                 day: d,
                 weekDay,
@@ -1274,7 +1276,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 dateStr,
                 weather: weatherData[dateStr],
                 remark: remarks[dateStr] || '',
-                visitorCount: dailyVisitorStats[dateStr] || 0
+                visitorCount,
+                dailyARPU: visitorCount > 0 ? (dailyRevenue[d] || 0) / visitorCount : 0
             });
         }
         return report;
@@ -1296,6 +1299,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             const date = new Date(year, month - 1, d);
             const weekDay = weekDayMap[date.getDay()];
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const visitorCount = dailyVisitorStats[dateStr] || 0;
             report.push({
                 day: d,
                 weekDay,
@@ -1304,7 +1308,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 dateStr,
                 weather: weatherData[dateStr],
                 remark: remarks[dateStr] || '',
-                visitorCount: dailyVisitorStats[dateStr] || 0
+                visitorCount,
+                dailyARPU: visitorCount > 0 ? (dailyRevenue[d] || 0) / visitorCount : 0
             });
         }
         return report;
@@ -1368,6 +1373,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             const weekDay = weekDayMap[date.getDay()];
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
+            const visitorCount = dailyVisitorStats[dateStr] || 0;
             report.push({
                 day: d,
                 weekDay,
@@ -1376,7 +1382,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 dateStr,
                 weather: weatherData[dateStr],
                 remark: remarks[dateStr] || '',
-                visitorCount: dailyVisitorStats[dateStr] || 0
+                visitorCount,
+                dailyARPU: visitorCount > 0 ? (dailyRevenue[d] || 0) / visitorCount : 0
             });
         }
 
@@ -2288,8 +2295,10 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                         <tr>
                                             <th className="px-4 py-3">當月日期</th>
                                             <th className="px-4 py-3">星期</th>
+                                            <th className="px-4 py-3">天氣 / 氣溫</th>
                                             <th className="px-4 py-3 text-right">當日收入</th>
                                             <th className="px-4 py-3 text-right">體驗人次</th>
+                                            <th className="px-4 py-3 text-right">日均客單價</th>
                                             <th className="px-4 py-3">備註</th>
                                         </tr>
                                     </thead>
@@ -2299,6 +2308,24 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                 <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
                                                 <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
                                                     {row.weekDay === '日' ? '星期日' : row.weekDay === '六' ? '星期六' : `星期${row.weekDay}`}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {row.weather ? (
+                                                        <div className="flex items-center gap-2 text-slate-600 text-sm">
+                                                            {row.weather.code === 0 || row.weather.code === 1 ? <Sun className="w-4 h-4 text-orange-500" /> :
+                                                                row.weather.code === 2 || row.weather.code === 3 ? <Cloud className="w-4 h-4 text-slate-400" /> :
+                                                                    row.weather.code >= 51 && row.weather.code <= 67 ? <CloudRain className="w-4 h-4 text-blue-400" /> :
+                                                                        row.weather.code >= 71 && row.weather.code <= 77 ? <CloudSnow className="w-4 h-4 text-indigo-300" /> :
+                                                                            row.weather.code >= 95 ? <CloudLightning className="w-4 h-4 text-purple-500" /> :
+                                                                                <Cloud className="w-4 h-4 text-slate-400" />
+                                                            }
+                                                            <span className="font-mono text-xs">
+                                                                {row.weather.min}°C - {row.weather.max}°C
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-slate-300">-</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-right text-slate-800 font-mono">
                                                     ${new Intl.NumberFormat('en-US').format(row.revenue)}
@@ -2314,7 +2341,18 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                         className="w-20 text-right bg-slate-50 border-b border-slate-200 rounded px-1"
                                                     />
                                                 </td>
-                                                <td className="px-4 py-3 text-xs text-slate-500">{row.remark}</td>
+                                                <td className="px-4 py-3 text-right font-mono text-cyan-700">
+                                                    ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <input
+                                                        type="text"
+                                                        value={row.remark}
+                                                        onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
+                                                        placeholder="..."
+                                                        className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-500"
+                                                    />
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -2418,8 +2456,10 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                         <tr>
                                             <th className="px-4 py-3">當月日期</th>
                                             <th className="px-4 py-3">星期</th>
+                                            <th className="px-4 py-3">天氣 / 氣溫</th>
                                             <th className="px-4 py-3 text-right">當日收入</th>
                                             <th className="px-4 py-3 text-right">體驗人次</th>
+                                            <th className="px-4 py-3 text-right">日均客單價</th>
                                             <th className="px-4 py-3">備註</th>
                                         </tr>
                                     </thead>
@@ -2429,6 +2469,24 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                 <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
                                                 <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
                                                     {row.weekDay === '日' ? '星期日' : row.weekDay === '六' ? '星期六' : `星期${row.weekDay}`}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {row.weather ? (
+                                                        <div className="flex items-center gap-2 text-slate-600 text-sm">
+                                                            {row.weather.code === 0 || row.weather.code === 1 ? <Sun className="w-4 h-4 text-orange-500" /> :
+                                                                row.weather.code === 2 || row.weather.code === 3 ? <Cloud className="w-4 h-4 text-slate-400" /> :
+                                                                    row.weather.code >= 51 && row.weather.code <= 67 ? <CloudRain className="w-4 h-4 text-blue-400" /> :
+                                                                        row.weather.code >= 71 && row.weather.code <= 77 ? <CloudSnow className="w-4 h-4 text-indigo-300" /> :
+                                                                            row.weather.code >= 95 ? <CloudLightning className="w-4 h-4 text-purple-500" /> :
+                                                                                <Cloud className="w-4 h-4 text-slate-400" />
+                                                            }
+                                                            <span className="font-mono text-xs">
+                                                                {row.weather.min}°C - {row.weather.max}°C
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-slate-300">-</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-right text-slate-800 font-mono">
                                                     ${new Intl.NumberFormat('en-US').format(row.revenue)}
@@ -2444,7 +2502,18 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                         className="w-20 text-right bg-slate-50 border-b border-slate-200 rounded px-1"
                                                     />
                                                 </td>
-                                                <td className="px-4 py-3 text-xs text-slate-500">{row.remark}</td>
+                                                <td className="px-4 py-3 text-right font-mono text-cyan-700">
+                                                    ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <input
+                                                        type="text"
+                                                        value={row.remark}
+                                                        onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
+                                                        placeholder="..."
+                                                        className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-500"
+                                                    />
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -2592,6 +2661,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             <th className="px-4 py-3">天氣 / 氣溫</th>
                                             <th className="px-4 py-3 text-right">當日收入</th>
                                             <th className="px-4 py-3 text-right">體驗人次</th>
+                                            <th className="px-4 py-3 text-right">日均客單價</th>
                                             <th className="px-4 py-3">備註</th>
                                         </tr>
                                     </thead>
@@ -2637,6 +2707,9 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                         placeholder="0"
                                                         className="w-20 text-right bg-slate-50 border-b border-slate-200 hover:border-blue-500 focus:border-blue-600 focus:outline-none text-sm text-slate-700 transition-colors placeholder:text-slate-200 rounded px-1"
                                                     />
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-mono text-cyan-700">
+                                                    ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <input
