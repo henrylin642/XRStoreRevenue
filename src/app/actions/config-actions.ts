@@ -34,3 +34,25 @@ export async function updateSystemConfig(key: string, value: any) {
     revalidatePath('/');
     return { success: true };
 }
+
+export async function getSystemConfigsByPattern(pattern: string) {
+    if (!supabaseAdmin) return {};
+
+    const { data, error } = await supabaseAdmin
+        .from('system_configs')
+        .select('key, value')
+        .like('key', pattern);
+
+    if (error) {
+        console.error(`Error fetching configs by pattern ${pattern}:`, error);
+        return {};
+    }
+
+    if (!data) return {};
+
+    // Transform array to object { key: value }
+    return data.reduce((acc, curr) => {
+        acc[curr.key] = curr.value;
+        return acc;
+    }, {} as Record<string, any>);
+}

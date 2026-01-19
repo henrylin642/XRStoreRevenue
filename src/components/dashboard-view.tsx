@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { getVisitorStats, getDailyVisitorStats } from '@/lib/visitor-data';
 import { HOLIDAY_DATA_2026, getDailyRemark, isPublicHoliday } from '@/lib/holiday-data-2026';
 import { updateDailyVisitorCount } from '@/app/actions/visitor-actions';
-import { getSystemConfig, updateSystemConfig } from '@/app/actions/config-actions';
+import { getSystemConfig, updateSystemConfig, getSystemConfigsByPattern } from '@/app/actions/config-actions';
 
 interface DashboardViewProps {
     transactions: Transaction[];
@@ -1353,26 +1353,36 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             setIsFetchingData(true);
             isHydrating.current = true;
             try {
-                // Determine all date strings to fetch
-                const datesToFetch: string[] = [];
-                monthsToLoad.forEach(m => {
-                    const daysInMonth = new Date(year, m, 0).getDate();
-                    for (let d = 1; d <= daysInMonth; d++) {
-                        datesToFetch.push(`${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
-                    }
-                });
+                let pattern = '';
+                // Check if we are loading a full year (or essentially all months)
+                // If monthsToLoad.length is 1, we can be specific: `ops_granular_${year}-${month}-%`
+                // If monthsToLoad is 12 (or 'All'), we can use `ops_granular_${year}-%` or just `ops_granular_${year}%`
 
-                // Parallel fetch
-                const results = await Promise.all(datesToFetch.map(async (dateStr) => {
-                    const key = `ops_granular_${dateStr}`;
-                    const val = await getSystemConfig(key, '');
-                    return { dateStr, val, key };
-                }));
+                if (monthsToLoad.length === 12) {
+                    pattern = `ops_granular_${year}%`; // Fetch whole year
+                } else if (monthsToLoad.length === 1) {
+                    const m = String(monthsToLoad[0]).padStart(2, '0');
+                    pattern = `ops_granular_${year}-${m}-%`;
+                } else {
+                    // Fallback for custom multiple months (rare case): just fetch whole year or iterate
+                    // For now, let's fetch whole year if multiple months > 1 as it's efficient enough
+                    pattern = `ops_granular_${year}%`;
+                }
+
+                // Batch Fetch
+                const dataMap = await getSystemConfigsByPattern(pattern);
 
                 const newData: Record<string, any> = {};
                 const newRemarks: Record<string, string> = {};
 
-                results.forEach(({ dateStr, val, key }) => {
+                Object.entries(dataMap).forEach(([key, val]) => {
+                    // key format: ops_granular_YYYY-MM-DD
+                    const dateStr = key.replace('ops_granular_', '');
+                    // Verify if this date is within our target months (optional, but good safety)
+                    // If we fetched the whole year but only wanted specific months, filtering here is fine.
+                    // But actually, hydrating extra data (cache) is beneficial.
+                    // So we just process everything we got.
+
                     if (val) {
                         try {
                             const parsed = JSON.parse(val);
