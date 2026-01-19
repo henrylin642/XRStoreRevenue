@@ -1759,6 +1759,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                             </ResponsiveContainer>
                         </div>
                     </div>
+
+                    <AttractionRankingCard
+                        month={selectedMonth}
+                        year={selectedYear}
+                        granularData={granularData}
+                        attractions={attractions}
+                        title={`${selectedYear !== 'All' ? selectedYear + '年' : '歷年'}${selectedMonth !== 'All' ? selectedMonth + '月' : ''} 遊戲項目熱門排行榜`}
+                    />
                 </div>
             )}
 
@@ -3267,28 +3275,33 @@ function AttractionRankingCard({
     month,
     year,
     granularData,
-    attractions
+    attractions,
+    title = "遊戲項目熱門排行榜"
 }: {
-    month: number,
-    year: number,
+    month?: string | number,
+    year?: string | number,
     granularData: Record<string, any>,
-    attractions: string[]
+    attractions: string[],
+    title?: string
 }) {
     const ranking = useMemo(() => {
-        const daysInMonth = new Date(year, month, 0).getDate();
         const totals: Record<string, number> = {};
         attractions.forEach(a => totals[a] = 0);
 
-        for (let d = 1; d <= daysInMonth; d++) {
-            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            const g = granularData[dateStr] || {};
-            const itemAttractions = g.attractions || {};
-            Object.entries(itemAttractions).forEach(([name, count]) => {
-                if (totals[name] !== undefined) {
-                    totals[name] += (Number(count) || 0);
-                }
-            });
-        }
+        Object.entries(granularData).forEach(([dateStr, g]) => {
+            const [y, m] = dateStr.split('-');
+            const yearMatch = !year || year === 'All' || y === String(year);
+            const monthMatch = !month || month === 'All' || parseInt(m) === (typeof month === 'string' ? parseInt(month) : month);
+
+            if (yearMatch && monthMatch) {
+                const itemAttractions = g.attractions || {};
+                Object.entries(itemAttractions).forEach(([name, count]) => {
+                    if (totals[name] !== undefined) {
+                        totals[name] += (Number(count) || 0);
+                    }
+                });
+            }
+        });
 
         return Object.entries(totals)
             .map(([name, count]) => ({ name, count }))
@@ -3304,7 +3317,7 @@ function AttractionRankingCard({
         <div className="mb-8 space-y-4">
             <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-orange-500" />
-                遊戲項目熱門排行榜
+                {title}
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {ranking.map((item, index) => (
