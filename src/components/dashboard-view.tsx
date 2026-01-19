@@ -3097,360 +3097,363 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 </div>
                             </div>
                         </div>
-                    );
+                    )
+                }
+            </div>
+            );
 }
 
-                // --- Sub-Components ---
+            // --- Sub-Components ---
 
-                function GranularEntryModal({
-                    editingGranularDate,
-                    setEditingGranularDate,
-                    granularData,
-                    setGranularData,
-                    attractions
-                }: {
-                    editingGranularDate: string | null;
+            function GranularEntryModal({
+                editingGranularDate,
+                setEditingGranularDate,
+                granularData,
+                setGranularData,
+                attractions
+            }: {
+                editingGranularDate: string | null;
     setEditingGranularDate: (val: string | null) => void;
-                granularData: any;
+            granularData: any;
     setGranularData: (val: any | ((prev: any) => any)) => void;
-                attractions: string[];
+            attractions: string[];
 }) {
     if (!editingGranularDate) return null;
-                const dateStr = editingGranularDate;
-                const data = granularData[dateStr] || { };
-                const dayAttractions = data.attractions || { };
+            const dateStr = editingGranularDate;
+            const data = granularData[dateStr] || { };
+            const dayAttractions = data.attractions || { };
 
-                return (
-                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
-                        <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
-                            <h3 className="font-bold">{dateStr} 細節輸入</h3>
-                            <button onClick={() => setEditingGranularDate(null)} className="hover:bg-white/20 p-1 rounded">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-                            <div className="space-y-3">
-                                <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                    <Gamepad2 className="w-4 h-4 text-blue-500" /> 遊戲項目體驗人次
-                                </h4>
-                                <div className="grid grid-cols-1 gap-2">
-                                    {attractions.map(attr => (
-                                        <div key={attr} className="flex items-center justify-between gap-4 p-2 bg-slate-50 rounded border border-slate-100">
-                                            <span className="text-sm text-slate-600">{attr}</span>
-                                            <input
-                                                type="text"
-                                                inputMode="numeric"
-                                                value={dayAttractions[attr] || ''}
-                                                onChange={(e) => {
-                                                    const val = e.target.value.replace(/\D/g, '');
-                                                    setGranularData((prev: any) => ({
-                                                        ...prev,
-                                                        [dateStr]: {
-                                                            ...prev[dateStr],
-                                                            attractions: { ...dayAttractions, [attr]: parseInt(val) || 0 }
-                                                        }
-                                                    }));
-                                                }}
-                                                className="w-32 text-right bg-white border border-slate-200 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
+            return (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+                    <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
+                        <h3 className="font-bold">{dateStr} 細節輸入</h3>
+                        <button onClick={() => setEditingGranularDate(null)} className="hover:bg-white/20 p-1 rounded">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                    <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                        <div className="space-y-3">
+                            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                <Gamepad2 className="w-4 h-4 text-blue-500" /> 遊戲項目體驗人次
+                            </h4>
+                            <div className="grid grid-cols-1 gap-2">
+                                {attractions.map(attr => (
+                                    <div key={attr} className="flex items-center justify-between gap-4 p-2 bg-slate-50 rounded border border-slate-100">
+                                        <span className="text-sm text-slate-600">{attr}</span>
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={dayAttractions[attr] || ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                setGranularData((prev: any) => ({
+                                                    ...prev,
+                                                    [dateStr]: {
+                                                        ...prev[dateStr],
+                                                        attractions: { ...dayAttractions, [attr]: parseInt(val) || 0 }
+                                                    }
+                                                }));
+                                            }}
+                                            className="w-32 text-right bg-white border border-slate-200 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                ))}
                             </div>
+                        </div>
 
-                            <div className="space-y-4 pt-4 border-t border-slate-100">
-                                <div className="space-y-2">
-                                    <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                        <Users className="w-4 h-4 text-purple-500" /> 包場數據
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-slate-400">包場收入</label>
-                                            <input
-                                                type="text"
-                                                inputMode="numeric"
-                                                value={data.privateEventRevenue || ''}
-                                                onChange={(e: any) => {
-                                                    const val = e.target.value.replace(/\D/g, '');
-                                                    setGranularData((prev: any) => ({
-                                                        ...prev,
-                                                        [dateStr]: { ...prev[dateStr], privateEventRevenue: parseInt(val) || 0 }
-                                                    }));
-                                                }}
-                                                className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-slate-400">包場人次</label>
-                                            <input
-                                                type="text"
-                                                inputMode="numeric"
-                                                value={data.privateEventVisitors || ''}
-                                                onChange={(e: any) => {
-                                                    const val = e.target.value.replace(/\D/g, '');
-                                                    setGranularData((prev: any) => ({
-                                                        ...prev,
-                                                        [dateStr]: { ...prev[dateStr], privateEventVisitors: parseInt(val) || 0 }
-                                                    }));
-                                                }}
-                                                className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
-                                                placeholder="0"
-                                            />
-                                        </div>
+                        <div className="space-y-4 pt-4 border-t border-slate-100">
+                            <div className="space-y-2">
+                                <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-purple-500" /> 包場數據
+                                </h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs text-slate-400">包場收入</label>
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={data.privateEventRevenue || ''}
+                                            onChange={(e: any) => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                setGranularData((prev: any) => ({
+                                                    ...prev,
+                                                    [dateStr]: { ...prev[dateStr], privateEventRevenue: parseInt(val) || 0 }
+                                                }));
+                                            }}
+                                            className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs text-slate-400">包場人次</label>
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={data.privateEventVisitors || ''}
+                                            onChange={(e: any) => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                setGranularData((prev: any) => ({
+                                                    ...prev,
+                                                    [dateStr]: { ...prev[dateStr], privateEventVisitors: parseInt(val) || 0 }
+                                                }));
+                                            }}
+                                            className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
+                                            placeholder="0"
+                                        />
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3">
-                            <button onClick={() => setEditingGranularDate(null)} className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-200 rounded-lg">
-                                確定
-                            </button>
-                        </div>
+                    </div>
+                    <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3">
+                        <button onClick={() => setEditingGranularDate(null)} className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-200 rounded-lg">
+                            確定
+                        </button>
+                    </div>
+                </div>
+            </div>
+            );
+}
+
+            function AttractionManager({
+                attractions,
+                setAttractions,
+                updateSystemConfig
+            }: {
+                attractions: string[];
+    setAttractions: (val: string[]) => void;
+    updateSystemConfig: (key: string, val: string) => Promise<any>;
+}) {
+    const [newItem, setNewItem] = useState('');
+                return (
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4 mb-6">
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                            <Settings className="w-4 h-4" /> 遊戲項目管理
+                        </h3>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {attractions.map(a => (
+                            <div key={a} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm group">
+                                {a}
+                                <button onClick={() => {
+                                    const newList = attractions.filter(i => i !== a);
+                                    setAttractions(newList);
+                                    updateSystemConfig('ops_attractions', JSON.stringify(newList));
+                                }} className="hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Trash2 className="w-3 h-3" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={newItem}
+                            onChange={(e) => setNewItem(e.target.value)}
+                            className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="新增項目..."
+                        />
+                        <button
+                            onClick={() => {
+                                if (newItem) {
+                                    const newList = [...attractions, newItem];
+                                    setAttractions(newList);
+                                    updateSystemConfig('ops_attractions', JSON.stringify(newList));
+                                    setNewItem('');
+                                }
+                            }}
+                            className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
+                        >
+                            <Plus className="w-4 h-4" />
+                        </button>
                     </div>
                 </div>
                 );
 }
 
-                function AttractionManager({
-                    attractions,
-                    setAttractions,
-                    updateSystemConfig
-                }: {
-                    attractions: string[];
-    setAttractions: (val: string[]) => void;
-    updateSystemConfig: (key: string, val: string) => Promise<any>;
-}) {
-    const [newItem, setNewItem] = useState('');
-                    return (
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4 mb-6">
-                        <div className="flex items-center justify-between">
-                            <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                                <Settings className="w-4 h-4" /> 遊戲項目管理
-                            </h3>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {attractions.map(a => (
-                                <div key={a} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm group">
-                                    {a}
-                                    <button onClick={() => {
-                                        const newList = attractions.filter(i => i !== a);
-                                        setAttractions(newList);
-                                        updateSystemConfig('ops_attractions', JSON.stringify(newList));
-                                    }} className="hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Trash2 className="w-3 h-3" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={newItem}
-                                onChange={(e) => setNewItem(e.target.value)}
-                                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="新增項目..."
-                            />
-                            <button
-                                onClick={() => {
-                                    if (newItem) {
-                                        const newList = [...attractions, newItem];
-                                        setAttractions(newList);
-                                        updateSystemConfig('ops_attractions', JSON.stringify(newList));
-                                        setNewItem('');
-                                    }
-                                }}
-                                className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
-                            >
-                                <Plus className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-                    );
-}
-
-                    function InvoiceTablePagination({data, refundSet}: {data: any[], refundSet: Set<string> }) {
+                function InvoiceTablePagination({data, refundSet}: {data: any[], refundSet: Set<string> }) {
     const [page, setPage] = useState(1);
-                        const pageSize = 50;
-                        const totalPages = Math.ceil(data.length / pageSize);
+                    const pageSize = 50;
+                    const totalPages = Math.ceil(data.length / pageSize);
 
     useEffect(() => {
-                            setPage(1);
+                        setPage(1);
     }, [data.length]);
 
     const currentData = useMemo(() => {
         const sorted = [...data].sort((a, b) => {
             const numA = a.invoiceNumber || '';
-                        const numB = b.invoiceNumber || '';
-                        if (numA === numB) return new Date(b.date).getTime() - new Date(a.date).getTime();
-                        return numA.localeCompare(numB);
+                    const numB = b.invoiceNumber || '';
+                    if (numA === numB) return new Date(b.date).getTime() - new Date(a.date).getTime();
+                    return numA.localeCompare(numB);
         });
-                        const start = (page - 1) * pageSize;
-                        return sorted.slice(start, start + pageSize);
+                    const start = (page - 1) * pageSize;
+                    return sorted.slice(start, start + pageSize);
     }, [data, page]);
 
-                        return (
-                        <>
-                            {currentData.map((t, idx) => {
-                                const hasInvoice = t.invoiceNumber && t.invoiceNumber.trim() !== '' && t.invoiceNumber !== '-';
-                                const isRefund = hasInvoice && refundSet.has(t.invoiceNumber);
-                                const invoiceStyle = hasInvoice
-                                    ? 'font-mono text-slate-700 font-medium group-hover:text-blue-600'
-                                    : 'text-red-500 font-bold';
+                    return (
+                    <>
+                        {currentData.map((t, idx) => {
+                            const hasInvoice = t.invoiceNumber && t.invoiceNumber.trim() !== '' && t.invoiceNumber !== '-';
+                            const isRefund = hasInvoice && refundSet.has(t.invoiceNumber);
+                            const invoiceStyle = hasInvoice
+                                ? 'font-mono text-slate-700 font-medium group-hover:text-blue-600'
+                                : 'text-red-500 font-bold';
 
-                                let remark = '';
-                                if (!hasInvoice) remark = '無發票記錄';
-                                else if (isRefund) remark = '銷退';
+                            let remark = '';
+                            if (!hasInvoice) remark = '無發票記錄';
+                            else if (isRefund) remark = '銷退';
 
-                                return (
-                                    <tr key={`${t.orderId}-${idx}`} className="hover:bg-slate-50 transition-colors group">
-                                        <td className="px-4 py-3 font-mono text-slate-500 text-xs">
-                                            {t.id}
-                                        </td>
-                                        <td className={`px-4 py-3 ${invoiceStyle} transition-colors`}>
-                                            {hasInvoice ? t.invoiceNumber : '無發票記錄'}
-                                        </td>
-                                        <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                                            {formatDateInTaipei(t.date)}
-                                        </td>
-                                        <td className={`px-4 py-3 text-right font-mono font-medium ${t.amount < 0 ? 'text-red-600' : 'text-slate-700'}`}>
-                                            ${t.amount.toLocaleString()}
-                                        </td>
-                                        <td className="px-4 py-3 text-slate-600">
-                                            <span className="bg-slate-100 px-2 py-1 rounded text-xs">{t.paymentMethod || '其他'}</span>
-                                        </td>
-                                        <td className={`px-4 py-3 text-xs font-bold ${remark === '無發票記錄' ? 'text-red-500' : 'text-slate-500'}`}>
-                                            {remark}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                            {totalPages > 1 && (
-                                <tr>
-                                    <td colSpan={6} className="p-4 border-t border-slate-100 bg-slate-50">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-xs text-slate-500">
-                                                顯示 {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, data.length)} 筆，共 {data.length} 筆
-                                            </span>
-                                            <div className="flex space-x-2">
-                                                <button
-                                                    onClick={() => setPage(Math.max(1, page - 1))}
-                                                    disabled={page === 1}
-                                                    className="px-3 py-1 bg-white border border-slate-300 rounded text-xs disabled:opacity-50 hover:bg-slate-50"
-                                                >
-                                                    上一頁
-                                                </button>
-                                                <span className="text-xs text-slate-600 self-center">
-                                                    {page} / {totalPages}
-                                                </span>
-                                                <button
-                                                    onClick={() => setPage(Math.min(totalPages, page + 1))}
-                                                    disabled={page === totalPages}
-                                                    className="px-3 py-1 bg-white border border-slate-300 rounded text-xs disabled:opacity-50 hover:bg-slate-50"
-                                                >
-                                                    下一頁
-                                                </button>
-                                            </div>
-                                        </div>
+                            return (
+                                <tr key={`${t.orderId}-${idx}`} className="hover:bg-slate-50 transition-colors group">
+                                    <td className="px-4 py-3 font-mono text-slate-500 text-xs">
+                                        {t.id}
+                                    </td>
+                                    <td className={`px-4 py-3 ${invoiceStyle} transition-colors`}>
+                                        {hasInvoice ? t.invoiceNumber : '無發票記錄'}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                                        {formatDateInTaipei(t.date)}
+                                    </td>
+                                    <td className={`px-4 py-3 text-right font-mono font-medium ${t.amount < 0 ? 'text-red-600' : 'text-slate-700'}`}>
+                                        ${t.amount.toLocaleString()}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-600">
+                                        <span className="bg-slate-100 px-2 py-1 rounded text-xs">{t.paymentMethod || '其他'}</span>
+                                    </td>
+                                    <td className={`px-4 py-3 text-xs font-bold ${remark === '無發票記錄' ? 'text-red-500' : 'text-slate-500'}`}>
+                                        {remark}
                                     </td>
                                 </tr>
-                            )}
-                        </>
-                        );
+                            );
+                        })}
+                        {totalPages > 1 && (
+                            <tr>
+                                <td colSpan={6} className="p-4 border-t border-slate-100 bg-slate-50">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs text-slate-500">
+                                            顯示 {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, data.length)} 筆，共 {data.length} 筆
+                                        </span>
+                                        <div className="flex space-x-2">
+                                            <button
+                                                onClick={() => setPage(Math.max(1, page - 1))}
+                                                disabled={page === 1}
+                                                className="px-3 py-1 bg-white border border-slate-300 rounded text-xs disabled:opacity-50 hover:bg-slate-50"
+                                            >
+                                                上一頁
+                                            </button>
+                                            <span className="text-xs text-slate-600 self-center">
+                                                {page} / {totalPages}
+                                            </span>
+                                            <button
+                                                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                                                disabled={page === totalPages}
+                                                className="px-3 py-1 bg-white border border-slate-300 rounded text-xs disabled:opacity-50 hover:bg-slate-50"
+                                            >
+                                                下一頁
+                                            </button>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        )}
+                    </>
+                    );
 }
 
-                        function UploadButton() {
+                    function UploadButton() {
     const router = useRouter();
-                        const [uploading, setUploading] = useState(false);
+                    const [uploading, setUploading] = useState(false);
 
-                        const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+                    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
 
-                            const file = e.target.files[0];
-                            setUploading(true);
-                            const formData = new FormData();
-                            formData.append('file', file);
+                        const file = e.target.files[0];
+                        setUploading(true);
+                        const formData = new FormData();
+                        formData.append('file', file);
 
-                            try {
+                        try {
             const res = await fetch('/api/upload', {
-                                method: 'POST',
-                            body: formData
+                            method: 'POST',
+                        body: formData
             });
-                            const data = await res.json();
-                            if (data.success) {
-                                alert(data.message);
-                            router.refresh();
+                        const data = await res.json();
+                        if (data.success) {
+                            alert(data.message);
+                        router.refresh();
             } else {
-                                alert('上傳失敗: ' + data.error);
+                            alert('上傳失敗: ' + data.error);
             }
         } catch (err) {
-                                console.error(err);
-                            alert('上傳發生錯誤');
+                            console.error(err);
+                        alert('上傳發生錯誤');
         } finally {
-                                setUploading(false);
-                            e.target.value = '';
+                            setUploading(false);
+                        e.target.value = '';
         }
     };
 
-                            return (
-                            <label className={`
+                        return (
+                        <label className={`
             flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm font-medium cursor-pointer transition-colors
             ${uploading ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}
         `}>
-                                <input
-                                    type="file"
-                                    accept=".xlsx"
-                                    className="hidden"
-                                    onChange={handleUpload}
-                                    disabled={uploading}
-                                />
-                                {uploading ? (
-                                    <span>處理中...</span>
-                                ) : (
-                                    <>
-                                        <CloudRain className="w-4 h-4" />
-                                        <span>上傳報表</span>
-                                    </>
-                                )}
-                            </label>
-                            );
+                            <input
+                                type="file"
+                                accept=".xlsx"
+                                className="hidden"
+                                onChange={handleUpload}
+                                disabled={uploading}
+                            />
+                            {uploading ? (
+                                <span>處理中...</span>
+                            ) : (
+                                <>
+                                    <CloudRain className="w-4 h-4" />
+                                    <span>上傳報表</span>
+                                </>
+                            )}
+                        </label>
+                        );
 }
 
-                            function Card({title, value, sub, icon, trend}: any) {
+                        function Card({title, value, sub, icon, trend}: any) {
     return (
-                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between h-full relative overflow-hidden group hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">{title}</h4>
-                                        <h2 className="text-2xl font-bold text-slate-800 mt-1">{value}</h2>
-                                    </div>
-                                    <div className="p-2 bg-slate-50 rounded-lg group-hover:scale-110 transition-transform">
-                                        {icon}
-                                    </div>
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between h-full relative overflow-hidden group hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">{title}</h4>
+                                    <h2 className="text-2xl font-bold text-slate-800 mt-1">{value}</h2>
                                 </div>
-                                {sub && (
-                                    <div className="text-xs text-slate-400 mt-auto pt-2 border-t border-slate-50">
-                                        {sub}
-                                    </div>
-                                )}
+                                <div className="p-2 bg-slate-50 rounded-lg group-hover:scale-110 transition-transform">
+                                    {icon}
+                                </div>
                             </div>
-                            );
+                            {sub && (
+                                <div className="text-xs text-slate-400 mt-auto pt-2 border-t border-slate-50">
+                                    {sub}
+                                </div>
+                            )}
+                        </div>
+                        );
 }
 
-                            function AttractionRankingCard({
-                                month,
-                                year,
-                                granularData,
-                                attractions,
-                                title = "遊戲項目熱門排行榜"
-                            }: {
-                                month ?: string | number,
-                                year ?: string | number,
-                                granularData: Record<string, any>,
-                            attractions: string[],
-                            title?: string
+                        function AttractionRankingCard({
+                            month,
+                            year,
+                            granularData,
+                            attractions,
+                            title = "遊戲項目熱門排行榜"
+                        }: {
+                            month ?: string | number,
+                            year ?: string | number,
+                            granularData: Record<string, any>,
+                        attractions: string[],
+                        title?: string
 }) {
     const ranking = useMemo(() => {
         const totals: Record<string, number> = { };
@@ -3458,20 +3461,20 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
         Object.entries(granularData).forEach(([dateStr, g]) => {
             const [y, m] = dateStr.split('-');
-                            const yearMatch = !year || year === 'All' || y === String(year);
-                            const monthMatch = !month || month === 'All' || parseInt(m) === (typeof month === 'string' ? parseInt(month) : month);
+                        const yearMatch = !year || year === 'All' || y === String(year);
+                        const monthMatch = !month || month === 'All' || parseInt(m) === (typeof month === 'string' ? parseInt(month) : month);
 
-                            if (yearMatch && monthMatch) {
+                        if (yearMatch && monthMatch) {
                 const itemAttractions = g.attractions || { };
                 Object.entries(itemAttractions).forEach(([name, count]) => {
                     if (totals[name] !== undefined) {
-                                totals[name] += (Number(count) || 0);
+                            totals[name] += (Number(count) || 0);
                     }
                 });
             }
         });
 
-                            return Object.entries(totals)
+                        return Object.entries(totals)
             .map(([name, count]) => ({name, count}))
             .filter(item => item.count > 0)
             .sort((a, b) => b.count - a.count);
@@ -3479,41 +3482,41 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
     const maxCount = Math.max(...ranking.map(r => r.count), 1);
 
-                            if (ranking.length === 0) return null;
+                        if (ranking.length === 0) return null;
 
-                            return (
-                            <div className="mb-8 space-y-4">
-                                <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    <TrendingUp className="w-5 h-5 text-orange-500" />
-                                    {title}
-                                </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {ranking.map((item, index) => (
-                                        <div key={item.name} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3 hover:shadow-md transition-shadow">
-                                            <div className="flex justify-between items-center">
-                                                <div className="flex items-center gap-3">
-                                                    <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${index === 0 ? 'bg-orange-100 text-orange-600' :
-                                                        index === 1 ? 'bg-slate-100 text-slate-600' :
-                                                            index === 2 ? 'bg-amber-100 text-amber-600' : 'bg-slate-50 text-slate-400'
-                                                        }`}>
-                                                        {index + 1}
-                                                    </span>
-                                                    <span className="font-semibold text-slate-700">{item.name}</span>
-                                                </div>
-                                                <span className="text-sm font-mono text-slate-500 font-bold">
-                                                    {new Intl.NumberFormat('en-US').format(item.count)} <span className="text-xs text-slate-400 font-normal">人次</span>
+                        return (
+                        <div className="mb-8 space-y-4">
+                            <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <TrendingUp className="w-5 h-5 text-orange-500" />
+                                {title}
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {ranking.map((item, index) => (
+                                    <div key={item.name} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3 hover:shadow-md transition-shadow">
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex items-center gap-3">
+                                                <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${index === 0 ? 'bg-orange-100 text-orange-600' :
+                                                    index === 1 ? 'bg-slate-100 text-slate-600' :
+                                                        index === 2 ? 'bg-amber-100 text-amber-600' : 'bg-slate-50 text-slate-400'
+                                                    }`}>
+                                                    {index + 1}
                                                 </span>
+                                                <span className="font-semibold text-slate-700">{item.name}</span>
                                             </div>
-                                            <div className="w-full bg-slate-50 rounded-full h-2 overflow-hidden">
-                                                <div
-                                                    className={`h-full transition-all duration-1000 ${index === 0 ? 'bg-orange-500' : 'bg-blue-400'
-                                                        }`}
-                                                    style={{ width: `${(item.count / maxCount) * 100}%` }}
-                                                />
-                                            </div>
+                                            <span className="text-sm font-mono text-slate-500 font-bold">
+                                                {new Intl.NumberFormat('en-US').format(item.count)} <span className="text-xs text-slate-400 font-normal">人次</span>
+                                            </span>
                                         </div>
-                                    ))}
-                                </div>
+                                        <div className="w-full bg-slate-50 rounded-full h-2 overflow-hidden">
+                                            <div
+                                                className={`h-full transition-all duration-1000 ${index === 0 ? 'bg-orange-500' : 'bg-blue-400'
+                                                    }`}
+                                                style={{ width: `${(item.count / maxCount) * 100}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                            );
+                        </div>
+                        );
 }
