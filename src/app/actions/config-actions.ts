@@ -56,3 +56,28 @@ export async function getSystemConfigsByPattern(pattern: string) {
         return acc;
     }, {} as Record<string, any>);
 }
+
+export async function updateSystemConfigsBatch(updates: { key: string, value: any }[]) {
+    if (!supabaseAdmin) throw new Error('Supabase admin client not initialized');
+
+    if (updates.length === 0) return { success: true };
+
+    const { error } = await supabaseAdmin
+        .from('system_configs')
+        .upsert(
+            updates.map(u => ({
+                key: u.key,
+                value: u.value,
+                updated_at: new Date().toISOString()
+            })),
+            { onConflict: 'key' }
+        );
+
+    if (error) {
+        console.error('Error batch updating configs:', error);
+        throw new Error('Failed to batch update system configurations');
+    }
+
+    revalidatePath('/');
+    return { success: true };
+}

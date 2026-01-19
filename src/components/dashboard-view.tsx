@@ -17,6 +17,7 @@ import { getVisitorStats, getDailyVisitorStats } from '@/lib/visitor-data';
 import { HOLIDAY_DATA_2026, getDailyRemark, isPublicHoliday } from '@/lib/holiday-data-2026';
 import { updateDailyVisitorCount } from '@/app/actions/visitor-actions';
 import { getSystemConfig, updateSystemConfig, getSystemConfigsByPattern } from '@/app/actions/config-actions';
+import { OperationsExcelImporter } from './operations-excel-importer';
 
 interface DashboardViewProps {
     transactions: Transaction[];
@@ -1693,6 +1694,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                             ))}
                         </select>
 
+                        <OperationsExcelImporter />
                         <UploadButton />
 
                         <button
