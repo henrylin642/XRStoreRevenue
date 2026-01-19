@@ -1417,6 +1417,35 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         loadData();
     }, [activeTab, ops2024Month, ops2025Month, ops2026Month, selectedYear, selectedMonth]);
 
+    // Calculate aggregated stats for Overview Cards
+    const overviewStats = useMemo(() => {
+        let totalVisitors = 0;
+        const targetYear = parseInt(selectedYear);
+        const targetMonth = selectedMonth === 'All' ? null : parseInt(selectedMonth);
+
+        Object.entries(granularData).forEach(([dateStr, data]) => {
+            if (!data) return;
+            // dateStr format YYYY-MM-DD
+            const [y, m, d] = dateStr.split('-').map(Number);
+            if (y === targetYear) {
+                if (targetMonth === null || m === targetMonth) {
+                    // Sum visitors
+                    if (data.attractions) {
+                        const dailySum = Object.values(data.attractions).reduce((a, b) => (a as number) + (b as number), 0) as number;
+                        totalVisitors += dailySum;
+                    }
+                }
+            }
+        });
+
+        const revenuePerVisitor = totalVisitors > 0 ? Math.round(stats.totalRevenue / totalVisitors) : 0;
+
+        return {
+            totalVisitors,
+            revenuePerVisitor
+        };
+    }, [granularData, selectedYear, selectedMonth, stats.totalRevenue]);
+
     useEffect(() => {
         // Initial fetch of target configuration
         getSystemConfig('target_2026', 5600000).then(val => {
@@ -1716,8 +1745,23 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card title="期間總營收"
                     value={`$${stats.totalRevenue.toLocaleString()}`}
-                    sub={`共 ${stats.totalTx.toLocaleString()} 筆交易`}
+                    sub="含所有支付方式"
                     icon={<DollarSign className="w-8 h-8 text-green-500 opacity-80" />} trend="up" />
+
+                <Card title="交易筆數"
+                    value={`${stats.totalTx.toLocaleString()} 筆`}
+                    sub={`平均單筆: $${stats.totalTx > 0 ? Math.round(stats.totalRevenue / stats.totalTx).toLocaleString() : 0}`}
+                    icon={<Ticket className="w-8 h-8 text-indigo-500 opacity-80" />} />
+
+                <Card title="體驗人次"
+                    value={`${overviewStats.totalVisitors.toLocaleString()} 人`}
+                    sub="含所有遊戲項目"
+                    icon={<Users className="w-8 h-8 text-purple-500 opacity-80" />} />
+
+                <Card title="每人次客單價 (RPV)"
+                    value={`$${overviewStats.revenuePerVisitor.toLocaleString()}`}
+                    sub="平均每位訪客貢獻"
+                    icon={<TrendingUp className="w-8 h-8 text-rose-500 opacity-80" />} />
 
                 <Card title="累計應收 (預計)"
                     value={`$${receivableTarget.toLocaleString()}`}
@@ -1728,175 +1772,179 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     value={`$${stats.totalActualCumulative.toLocaleString()}`}
                     sub={`達成率: ${receivableTarget > 0 ? ((stats.totalActualCumulative / receivableTarget) * 100).toFixed(1) : 0}%`}
                     icon={<CheckCircle className="w-8 h-8 text-blue-500 opacity-80" />} />
+
                 <Card title="平均客單價 (ATV)"
-                    value={`$${Math.round(stats.avgTicket).toLocaleString()}`}
+                    value={`$${stats.totalTx > 0 ? Math.round(stats.totalRevenue / stats.totalTx).toLocaleString() : 0}`}
                     sub="每筆訂單平均"
-                    icon={<CreditCard className="w-8 h-8 text-purple-500 opacity-80" />} trend="neutral" />
-            </div>
+                    icon={<CreditCard className="w-8 h-8 text-pink-500 opacity-80" />} />
+                {/* Loading Overlay */}
+                {
+                    (isPending || isFetchingData) && (
+                        <div className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-50 flex items-center justify-center animate-in fade-in duration-200">
+                            <div className="bg-white px-6 py-4 rounded-xl shadow-xl border border-slate-100 flex items-center gap-3">
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                                <span className="font-bold text-slate-700">數據加載中...</span>
+                            </div>
+                        </div>
+                    )
+                }
 
-            {/* Loading Overlay */}
-            {(isPending || isFetchingData) && (
-                <div className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-50 flex items-center justify-center animate-in fade-in duration-200">
-                    <div className="bg-white px-6 py-4 rounded-xl shadow-xl border border-slate-100 flex items-center gap-3">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                        <span className="font-bold text-slate-700">數據加載中...</span>
-                    </div>
-                </div>
-            )}
+                <div className="flex gap-2 overflow-x-auto pb-2 border-b border-slate-200">
+                    {[
+                        { id: 'overview', label: '營運總覽', icon: <TrendingUp className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
+                        { id: 'growth', label: '營收趨勢', icon: <TrendingUp className="w-4 h-4 mr-2" />, roles: ['admin'] },
+                        { id: 'invoice', label: '發票稽核', icon: <AlertTriangle className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
+                        { id: 'ops2024', label: '2024年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
+                        { id: 'ops2025', label: '2025年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
+                        { id: 'ops2026', label: '2026年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
+                        { id: 'visitor_stats', label: '訪客統計', icon: <Users className="w-4 h-4 mr-2" />, roles: ['admin'] },
+                        { id: 'reconciliation', label: '對帳中心', icon: <DollarSign className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
+                    ].filter(tab => tab.roles.includes(role)).map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => handleTabChange(tab.id as any)}
+                            className={`py-3 px-6 font-medium text-sm flex items-center transition-colors whitespace-nowrap ${activeTab === tab.id
+                                ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                                }`}
+                        >
+                            {tab.icon}
+                            {tab.label}
+                        </button>
+                    ))}
 
-            <div className="flex gap-2 overflow-x-auto pb-2 border-b border-slate-200">
-                {[
-                    { id: 'overview', label: '營運總覽', icon: <TrendingUp className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
-                    { id: 'growth', label: '營收趨勢', icon: <TrendingUp className="w-4 h-4 mr-2" />, roles: ['admin'] },
-                    { id: 'invoice', label: '發票稽核', icon: <AlertTriangle className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
-                    { id: 'ops2024', label: '2024年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
-                    { id: 'ops2025', label: '2025年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
-                    { id: 'ops2026', label: '2026年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
-                    { id: 'visitor_stats', label: '訪客統計', icon: <Users className="w-4 h-4 mr-2" />, roles: ['admin'] },
-                    { id: 'reconciliation', label: '對帳中心', icon: <DollarSign className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
-                ].filter(tab => tab.roles.includes(role)).map((tab) => (
+                    {/* Mobile/Ops friendly Logout Button in Tabs */}
                     <button
-                        key={tab.id}
-                        onClick={() => handleTabChange(tab.id as any)}
-                        className={`py-3 px-6 font-medium text-sm flex items-center transition-colors whitespace-nowrap ${activeTab === tab.id
-                            ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                            }`}
+                        onClick={async () => {
+                            const { logout } = await import('@/app/login/actions');
+                            await logout();
+                        }}
+                        className="py-3 px-6 font-medium text-sm flex items-center transition-colors text-slate-400 hover:text-red-500 hover:bg-red-50 ml-auto border-l border-slate-100"
                     >
-                        {tab.icon}
-                        {tab.label}
+                        <LogOut className="w-4 h-4 mr-2" />
+                        登出系統
                     </button>
-                ))}
+                </div>
 
-                {/* Mobile/Ops friendly Logout Button in Tabs */}
-                <button
-                    onClick={async () => {
-                        const { logout } = await import('@/app/login/actions');
-                        await logout();
-                    }}
-                    className="py-3 px-6 font-medium text-sm flex items-center transition-colors text-slate-400 hover:text-red-500 hover:bg-red-50 ml-auto border-l border-slate-100"
-                >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    登出系統
-                </button>
-            </div>
+                {/* Overview Tab */}
+                {
+                    activeTab === 'overview' && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-lg font-bold text-slate-800">營收走勢分析</h3>
+                                        <div className="flex bg-slate-100 p-1 rounded-lg">
+                                            {(['day', 'week', 'month'] as const).map((g) => (
+                                                <button
+                                                    key={g}
+                                                    onClick={() => setGranularity(g)}
+                                                    className={`px-3 py-1 text-sm font-medium rounded-md transition-all ${granularity === g
+                                                        ? 'bg-white text-blue-600 shadow-sm'
+                                                        : 'text-slate-500 hover:text-slate-700'
+                                                        }`}
+                                                >
+                                                    {g === 'day' ? '每日' : g === 'week' ? '每週' : '每月'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="h-80">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <ComposedChart key={`${selectedYear}-${selectedMonth}-${granularity}`} data={stats.trendData}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                                                <XAxis
+                                                    dataKey="date"
+                                                    minTickGap={30}
+                                                    tickFormatter={val => granularity === 'day' ? val.slice(5) : val}
+                                                />
+                                                <YAxis
+                                                    yAxisId="left"
+                                                    tickFormatter={(val) => `$${(val / 1000).toLocaleString()}k`}
+                                                    label={{ value: '營收', angle: -90, position: 'insideLeft' }}
+                                                    domain={[0, (dataMax: number) => Math.max(dataMax, beValue * 1.2, chartTargetValue * 1.2)]}
+                                                />
+                                                <Tooltip
+                                                    formatter={(val: number | string | Array<number | string> | undefined, name: string | undefined) => {
+                                                        if (name === 'count') return [`${val} 筆`, '交易筆數'];
+                                                        if (name === 'revenue') return [`$${(val as number).toLocaleString()}`, '營收'];
+                                                        return val;
+                                                    }}
+                                                    labelFormatter={(label) => `時間: ${label}`}
+                                                />
+                                                <Legend />
+                                                <Bar yAxisId="left" dataKey="revenue" name="營收" radius={[4, 4, 0, 0]} barSize={20}>
+                                                    {stats.trendData.map((entry: any, index: number) => (
+                                                        <Cell key={`cell-${index}`} fill={entry.isHighlight ? '#ef4444' : '#3b82f6'} />
+                                                    ))}
+                                                </Bar>
+                                                <ReferenceLine yAxisId="left" y={beValue} stroke="#ef4444" strokeDasharray="3 3">
+                                                    <Label value="損益兩平線" position="insideTopLeft" fill="#ef4444" fontSize={10} offset={5} />
+                                                </ReferenceLine>
+                                                <ReferenceLine yAxisId="left" y={chartTargetValue} stroke="#10b981" strokeDasharray="3 3">
+                                                    <Label value="目標業績線" position="insideTopLeft" fill="#10b981" fontSize={10} offset={5} />
+                                                </ReferenceLine>
+                                            </ComposedChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
 
-            {/* Overview Tab */}
-            {activeTab === 'overview' && (
-                <div className="space-y-6 animate-in fade-in duration-500">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-bold text-slate-800">營收走勢分析</h3>
-                                <div className="flex bg-slate-100 p-1 rounded-lg">
-                                    {(['day', 'week', 'month'] as const).map((g) => (
-                                        <button
-                                            key={g}
-                                            onClick={() => setGranularity(g)}
-                                            className={`px-3 py-1 text-sm font-medium rounded-md transition-all ${granularity === g
-                                                ? 'bg-white text-blue-600 shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-700'
-                                                }`}
-                                        >
-                                            {g === 'day' ? '每日' : g === 'week' ? '每週' : '每月'}
-                                        </button>
-                                    ))}
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4">支付方式佔比</h3>
+                                    <div className="h-64">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={Object.entries(stats.paymentMethods).map(([k, v]) => ({ name: k, value: v }))}
+                                                    cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5}
+                                                    dataKey="value"
+                                                >
+                                                    {Object.entries(stats.paymentMethods).map((_, index) => (
+                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip formatter={(val: number | undefined) => val !== undefined ? val.toLocaleString() : ''} />
+                                                <Legend />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="h-80">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <ComposedChart key={`${selectedYear}-${selectedMonth}-${granularity}`} data={stats.trendData}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                                        <XAxis
-                                            dataKey="date"
-                                            minTickGap={30}
-                                            tickFormatter={val => granularity === 'day' ? val.slice(5) : val}
-                                        />
-                                        <YAxis
-                                            yAxisId="left"
-                                            tickFormatter={(val) => `$${(val / 1000).toLocaleString()}k`}
-                                            label={{ value: '營收', angle: -90, position: 'insideLeft' }}
-                                            domain={[0, (dataMax: number) => Math.max(dataMax, beValue * 1.2, chartTargetValue * 1.2)]}
-                                        />
-                                        <Tooltip
-                                            formatter={(val: number | string | Array<number | string> | undefined, name: string | undefined) => {
-                                                if (name === 'count') return [`${val} 筆`, '交易筆數'];
-                                                if (name === 'revenue') return [`$${(val as number).toLocaleString()}`, '營收'];
-                                                return val;
-                                            }}
-                                            labelFormatter={(label) => `時間: ${label}`}
-                                        />
-                                        <Legend />
-                                        <Bar yAxisId="left" dataKey="revenue" name="營收" radius={[4, 4, 0, 0]} barSize={20}>
-                                            {stats.trendData.map((entry: any, index: number) => (
-                                                <Cell key={`cell-${index}`} fill={entry.isHighlight ? '#ef4444' : '#3b82f6'} />
-                                            ))}
-                                        </Bar>
-                                        <ReferenceLine yAxisId="left" y={beValue} stroke="#ef4444" strokeDasharray="3 3">
-                                            <Label value="損益兩平線" position="insideTopLeft" fill="#ef4444" fontSize={10} offset={5} />
-                                        </ReferenceLine>
-                                        <ReferenceLine yAxisId="left" y={chartTargetValue} stroke="#10b981" strokeDasharray="3 3">
-                                            <Label value="目標業績線" position="insideTopLeft" fill="#10b981" fontSize={10} offset={5} />
-                                        </ReferenceLine>
-                                    </ComposedChart>
-                                </ResponsiveContainer>
+
+                            {/* Hourly Chart */}
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                                <h3 className="text-lg font-bold text-slate-800 mb-4">時段熱度分析</h3>
+                                <div className="h-64">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={stats.hourlyData}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis dataKey="hour" />
+                                            <YAxis tickFormatter={(val) => `$${(val / 1000).toLocaleString()}k`} />
+                                            <Tooltip formatter={(val: number | undefined) => val ? `$${val.toLocaleString()}` : '$0'} />
+                                            <Bar dataKey="revenue" fill="#8884d8" radius={[4, 4, 0, 0]} name="營收" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
                             </div>
+
+                            <AttractionRankingCard
+                                month={selectedMonth}
+                                year={selectedYear}
+                                granularData={granularData}
+                                attractions={attractions}
+                                title={`${selectedYear !== 'All' ? selectedYear + '年' : '歷年'}${selectedMonth !== 'All' ? selectedMonth + '月' : ''} 遊戲項目熱門排行榜`}
+                            />
                         </div>
+                    )
+                }
 
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <h3 className="text-lg font-bold text-slate-800 mb-4">支付方式佔比</h3>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={Object.entries(stats.paymentMethods).map(([k, v]) => ({ name: k, value: v }))}
-                                            cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5}
-                                            dataKey="value"
-                                        >
-                                            {Object.entries(stats.paymentMethods).map((_, index) => (
-                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip formatter={(val: number | undefined) => val !== undefined ? val.toLocaleString() : ''} />
-                                        <Legend />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Hourly Chart */}
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                        <h3 className="text-lg font-bold text-slate-800 mb-4">時段熱度分析</h3>
-                        <div className="h-64">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={stats.hourlyData}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <XAxis dataKey="hour" />
-                                    <YAxis tickFormatter={(val) => `$${(val / 1000).toLocaleString()}k`} />
-                                    <Tooltip formatter={(val: number | undefined) => val ? `$${val.toLocaleString()}` : '$0'} />
-                                    <Bar dataKey="revenue" fill="#8884d8" radius={[4, 4, 0, 0]} name="營收" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-
-                    <AttractionRankingCard
-                        month={selectedMonth}
-                        year={selectedYear}
-                        granularData={granularData}
-                        attractions={attractions}
-                        title={`${selectedYear !== 'All' ? selectedYear + '年' : '歷年'}${selectedMonth !== 'All' ? selectedMonth + '月' : ''} 遊戲項目熱門排行榜`}
-                    />
-                </div>
-            )}
-
-            {/* Reconciliation Tab */}
-            {activeTab === 'reconciliation' && (
-                <div className="space-y-6 animate-in fade-in duration-500 print:m-0 print:p-0">
-                    {/* Print CSS */}
-                    <style dangerouslySetInnerHTML={{
-                        __html: `
+                {/* Reconciliation Tab */}
+                {
+                    activeTab === 'reconciliation' && (
+                        <div className="space-y-6 animate-in fade-in duration-500 print:m-0 print:p-0">
+                            {/* Print CSS */}
+                            <style dangerouslySetInnerHTML={{
+                                __html: `
                         @media print {
                             body * { visibility: hidden; }
                             .print-section, .print-section * { visibility: visible; }
@@ -1918,1556 +1966,1554 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                         }
                     `}} />
 
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 print-section">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 no-print">
-                            <div>
-                                <h3 className="text-lg font-bold text-slate-800">對帳中心</h3>
-                                <p className="text-sm text-slate-500">比對系統發票與平台交易數據 (依金額及時間自動匹配)</p>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-3">
-                                <button
-                                    onClick={() => {
-                                        const now = new Date();
-                                        const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                                        const lastDayThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                                        const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                        setReconStartDate(formatDate(firstDayThisMonth));
-                                        setReconEndDate(formatDate(lastDayThisMonth));
-                                    }}
-                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
-                                >
-                                    本月
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        const now = new Date();
-                                        const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                                        const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-                                        const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                        setReconStartDate(formatDate(firstDayLastMonth));
-                                        setReconEndDate(formatDate(lastDayLastMonth));
-                                    }}
-                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
-                                >
-                                    上個月
-                                </button>
-                                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
-                                    <span className="text-xs text-slate-500">從</span>
-                                    <input
-                                        type="date"
-                                        value={reconStartDate}
-                                        onChange={(e) => setReconStartDate(e.target.value)}
-                                        className="bg-transparent text-sm text-slate-700 outline-none"
-                                    />
-                                    <span className="text-xs text-slate-500">至</span>
-                                    <input
-                                        type="date"
-                                        value={reconEndDate}
-                                        onChange={(e) => setReconEndDate(e.target.value)}
-                                        className="bg-transparent text-sm text-slate-700 outline-none"
-                                    />
-                                </div>
-                                <select
-                                    value={reconPaymentMethod}
-                                    onChange={(e) => setReconPaymentMethod(e.target.value)}
-                                    className="bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <option value="一般信用卡">一般信用卡</option>
-                                    <option value="掃碼-全支付">掃碼-全支付</option>
-                                    <option value="掃碼-街口支付">掃碼-街口支付</option>
-                                    <option value="掃碼-LINE Pay">掃碼-LINE Pay</option>
-                                    <option value="掃碼-悠遊付">掃碼-悠遊付</option>
-                                    <option value="電子票證-悠遊卡-小額">電子票證-悠遊卡-小額</option>
-                                    <option value="電子票證-一卡通-小額">電子票證-一卡通-小額</option>
-                                    <option value="掃碼-iPass MONEY">掃碼-iPass MONEY</option>
-                                </select>
-                                <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm font-medium cursor-pointer hover:bg-blue-700 transition-colors">
-                                    <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handlePlatformUpload} />
-                                    <CloudRain className="w-4 h-4" />
-                                    <span>上傳平台數據</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* Print Header (Visible only when printing) */}
-                        <div className="hidden print:block mb-6 border-b-2 border-slate-800 pb-4">
-                            <h2 className="text-2xl font-black text-slate-900">對帳明細報表</h2>
-                            <div className="flex justify-between items-end mt-2">
-                                <p className="text-slate-600 text-sm">
-                                    對帳區間：<span className="font-bold">{reconStartDate}</span> 至 <span className="font-bold">{reconEndDate}</span>
-                                </p>
-                                <p className="text-slate-400 text-xs">列印日期：{new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</p>
-                            </div>
-                        </div>
-
-                        {!platformData.length ? (
-                            <div className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                                <div className="p-4 bg-white rounded-full shadow-sm mb-4">
-                                    <CreditCard className="w-10 h-10 text-slate-300" />
-                                </div>
-                                <h4 className="text-slate-600 font-medium mb-1">尚未上傳平台數據</h4>
-                                <p className="text-slate-400 text-sm mb-6">請上傳藍新金流或其他平台的交易報表進行自動比對</p>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                                <table className="w-full text-sm text-left border-collapse">
-                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-xs">
-                                        <tr>
-                                            <th className="px-4 py-3 border-r border-slate-200 bg-slate-100/50" colSpan={4}>系統發票紀錄 (左)</th>
-                                            <th className="px-4 py-3 text-center border-r border-slate-200 w-24">對帳狀態</th>
-                                            <th className="px-4 py-3 bg-slate-100/50" colSpan={3}>平台交易數據 (右)</th>
-                                        </tr>
-                                        <tr className="bg-slate-50/80 border-b border-slate-200">
-                                            <th className="px-4 py-2 font-medium">交易時間</th>
-                                            <th className="px-4 py-2 font-medium">發票號碼</th>
-                                            <th className="px-4 py-2 font-medium text-right">金額</th>
-                                            <th className="px-4 py-2 font-medium border-r border-slate-200">備註</th>
-                                            <th className="px-4 py-2 text-center border-r border-slate-200">-</th>
-                                            <th className="px-4 py-2 font-medium">交易時間</th>
-                                            <th className="px-4 py-2 font-medium">平台序號</th>
-                                            <th className="px-4 py-2 font-medium text-right">金額</th>
-                                            <th className="px-4 py-2 text-center w-10">-</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {reconciliationMatches.map((match, idx) => {
-                                            const isMatched = match.status === 'matched';
-                                            const sys = match.system;
-                                            const plat = match.platform;
-
-                                            return (
-                                                <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${!isMatched ? 'bg-red-50/30' : ''}`}>
-                                                    {/* System Info */}
-                                                    <td className={`px-4 py-3 text-xs ${(!sys || sys.isSalesReturn) ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                                                        {sys ? formatDateInTaipei(sys.date) : '缺失記錄'}
-                                                    </td>
-                                                    <td className={`px-4 py-3 font-mono ${(!sys || sys.isSalesReturn) ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
-                                                        {sys?.invoiceNumber || '無發票'}
-                                                    </td>
-                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${(!sys || sys.isSalesReturn) ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
-                                                        {sys ? `$${sys.amount.toLocaleString()}` : '-'}
-                                                    </td>
-                                                    <td className={`px-4 py-3 border-r border-slate-200 text-xs ${sys?.isSalesReturn ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
-                                                        {sys?.isSalesReturn ? '銷退' : ''}
-                                                    </td>
-
-                                                    {/* Status Icon */}
-                                                    <td className="px-4 py-3 text-center border-r border-slate-200">
-                                                        {isMatched ? (
-                                                            <div className="flex flex-col items-center">
-                                                                <CheckCircle className="w-5 h-5 text-green-500" />
-                                                                <span className="text-[10px] text-green-600 font-bold mt-1">已對齊</span>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex flex-col items-center">
-                                                                <AlertTriangle className="w-5 h-5 text-red-500" />
-                                                                <span className="text-[10px] text-red-600 font-bold mt-1">未匹配</span>
-                                                            </div>
-                                                        )}
-                                                    </td>
-
-                                                    {/* Platform Info */}
-                                                    <td className={`px-4 py-3 text-xs ${!plat ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                                                        {plat ? formatDateInTaipei(plat.date) : '缺失記錄'}
-                                                    </td>
-                                                    <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? 'text-red-500 font-bold' : 'text-slate-600'}`} title={plat?.txId}>
-                                                        {plat?.txId || '-'}
-                                                    </td>
-                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
-                                                        {plat ? `$${plat.amount.toLocaleString()}` : '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        {plat && (
-                                                            <button
-                                                                onClick={() => setInspectedRow(plat.raw)}
-                                                                className="p-1 hover:bg-slate-200 rounded-md transition-colors text-slate-400 hover:text-blue-600"
-                                                                title="查看原始數據"
-                                                            >
-                                                                <Info className="w-4 h-4" />
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-
-                        {platformData.length > 0 && (
-                            <div className="mt-6 flex items-center justify-between no-print">
-                                <button
-                                    onClick={() => window.print()}
-                                    className="flex items-center gap-2 px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-all shadow-lg active:scale-95"
-                                >
-                                    <Printer className="w-4 h-4" />
-                                    <span>列印對帳狀態</span>
-                                </button>
-
-                                <button
-                                    onClick={() => {
-                                        setPlatformData([]);
-                                        setIsMatching(false);
-                                    }}
-                                    className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-red-500 font-medium transition-colors text-sm"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                    <span>清除目前比對資料</span>
-                                </button>
-                            </div>
-                        )}
-
-                        {/* Raw Data Inspector Modal */}
-                        {inspectedRow && (
-                            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
-                                    <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                            <Info className="w-5 h-5 text-blue-500" />
-                                            原始數據檢查器 (Platform Row Data)
-                                        </h3>
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 print-section">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 no-print">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-slate-800">對帳中心</h3>
+                                        <p className="text-sm text-slate-500">比對系統發票與平台交易數據 (依金額及時間自動匹配)</p>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-3">
                                         <button
-                                            onClick={() => setInspectedRow(null)}
-                                            className="p-2 hover:bg-slate-200 rounded-full transition-colors"
-                                        >
-                                            <X className="w-5 h-5 text-slate-500" />
-                                        </button>
-                                    </div>
-                                    <div className="p-6 overflow-y-auto">
-                                        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                                            {Object.entries(inspectedRow).map(([key, val]) => (
-                                                <div key={key} className="border-b border-slate-50 pb-2">
-                                                    <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">{key}</span>
-                                                    <span className="text-sm text-slate-700 font-mono break-all">
-                                                        {typeof val === 'number' && val > 10000000 ? val.toFixed(0) : String(val)}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-                                        <button
-                                            onClick={() => setInspectedRow(null)}
-                                            className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg"
-                                        >
-                                            關閉
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Growth Tab */}
-            {
-                activeTab === 'growth' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                                <div>
-                                    <h3 className="text-lg font-bold text-slate-800">營收成長分析 (MoM / YoY)</h3>
-                                    <p className="text-sm text-slate-500">比較當前月份與上月、去年同期的營收變化</p>
-                                </div>
-                                <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                    <span className="text-sm font-semibold text-slate-700">2026 年度目標營業額:</span>
-                                    <div className="flex items-center gap-2 relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
-                                        <input
-                                            type="text"
-                                            value={target2026.toLocaleString()}
-                                            onChange={(e) => {
-                                                const rawValue = e.target.value.replace(/,/g, '');
-                                                const numValue = parseInt(rawValue) || 0;
-                                                setTarget2026(Math.max(0, numValue));
+                                            onClick={() => {
+                                                const now = new Date();
+                                                const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                                                const lastDayThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                                                const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                                setReconStartDate(formatDate(firstDayThisMonth));
+                                                setReconEndDate(formatDate(lastDayThisMonth));
                                             }}
-                                            className="pl-6 pr-3 py-1.5 w-32 md:w-40 border border-slate-300 rounded-lg text-right font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                        />
-                                    </div>
-                                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${isSavingTarget
-                                        ? 'text-blue-600 bg-blue-50 animate-pulse'
-                                        : 'text-slate-400 bg-slate-100'
-                                        }`}>
-                                        {isSavingTarget ? (
-                                            <>
-                                                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" />
-                                                自動儲存中...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <CheckCircle className="w-3 h-3 text-green-500" />
-                                                已自動儲存
-                                            </>
-                                        )}
-                                    </div>
-                                    <span className="text-xs text-slate-500 hidden md:inline">(依 2025 比例自動分配)</span>
-                                </div>
-                            </div>
-
-                            {/* Pivot Table Style Growth Report */}
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-4 py-3">月份</th>
-                                            <th className="px-4 py-3 text-right">2024年</th>
-                                            <th className="px-4 py-3 text-right">2025年</th>
-                                            <th className="px-4 py-3 text-right bg-blue-50/50 text-blue-800 border-l border-blue-100">2026 目標</th>
-                                            <th className="px-4 py-3 text-right">2026年</th>
-                                            <th className="px-4 py-3 text-right">YoY (26 vs 25)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {yearPivotData.map((row) => (
-                                            <tr key={row.month} className="hover:bg-slate-50/50">
-                                                <td className="px-4 py-3 font-medium text-slate-700">{row.month}月</td>
-                                                <td className="px-4 py-3 text-right text-slate-600">
-                                                    {row['2024'] ? `$${new Intl.NumberFormat('en-US').format(row['2024'])}` : '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-slate-600">
-                                                    {row['2025'] ? `$${new Intl.NumberFormat('en-US').format(row['2025'])}` : '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-mono text-blue-600 bg-blue-50/30 border-l border-blue-100">
-                                                    ${new Intl.NumberFormat('en-US').format(Math.round(row.target2026))}
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-bold text-slate-800">
-                                                    {row['2026'] ? `$${new Intl.NumberFormat('en-US').format(row['2026'])}` : '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    {row.yoy === null ? '-' : (
-                                                        <span className={`px-2 py-1 rounded text-xs font-bold ${row.yoy > 0 ? 'bg-green-100 text-green-700' :
-                                                            row.yoy < 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
-                                                            }`}>
-                                                            {row.yoy > 0 ? '+' : ''}{row.yoy.toFixed(1)}%
-                                                        </span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-200">
-                                        <tr>
-                                            <td className="px-4 py-3 text-slate-800">年度總計</td>
-                                            <td className="px-4 py-3 text-right text-slate-800">
-                                                ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r['2024'] || 0), 0))}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-slate-800">
-                                                ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r['2025'] || 0), 0))}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-blue-800 bg-blue-50/50 border-l border-blue-100">
-                                                ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r.target2026 || 0), 0))}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-slate-900 border-l border-r border-slate-200 bg-slate-200/50">
-                                                ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r['2026'] || 0), 0))}
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                {(() => {
-                                                    const total2025 = yearPivotData.reduce((sum, r) => sum + (r['2025'] || 0), 0);
-                                                    const total2026 = yearPivotData.reduce((sum, r) => sum + (r['2026'] || 0), 0);
-                                                    if (total2025 === 0) return '-';
-                                                    const yoy = ((total2026 - total2025) / total2025) * 100;
-                                                    return (
-                                                        <span className={`px-2 py-1 rounded text-xs font-bold ${yoy > 0 ? 'bg-green-100 text-green-800' :
-                                                            yoy < 0 ? 'bg-red-100 text-red-800' : 'bg-slate-200 text-slate-700'
-                                                            }`}>
-                                                            {yoy > 0 ? '+' : ''}{yoy.toFixed(1)}%
-                                                        </span>
-                                                    );
-                                                })()}
-                                            </td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Invoice Tab */}
-            {
-                activeTab === 'invoice' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            {/* Header & Sub-tabs */}
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                                <div>
-                                    <h3 className="text-lg font-bold text-slate-800">
-                                        {invoiceSubTab === 'list' ? '發票交易明細' : '異常偵測 (斷號分析)'}
-                                    </h3>
-                                    <p className="text-sm text-slate-500">
-                                        {invoiceSubTab === 'list'
-                                            ? '可透過日期區間與支付方式篩選特定交易'
-                                            : '自動檢測發票號碼連續性 (忽略支付方式篩選)'}
-                                    </p>
-                                </div>
-
-                                <div className="flex bg-slate-100 p-1 rounded-lg self-start md:self-auto">
-                                    <button
-                                        onClick={() => setInvoiceSubTab('list')}
-                                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${invoiceSubTab === 'list'
-                                            ? 'bg-white text-blue-600 shadow-sm'
-                                            : 'text-slate-500 hover:text-slate-700'}`}
-                                    >
-                                        明細列表
-                                    </button>
-                                    <button
-                                        onClick={() => setInvoiceSubTab('anomaly')}
-                                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${invoiceSubTab === 'anomaly'
-                                            ? 'bg-white text-red-600 shadow-sm'
-                                            : 'text-slate-500 hover:text-slate-700'}`}
-                                    >
-                                        異常偵測
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Filters Toolbar */}
-                            <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-slate-50 rounded-lg">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-semibold text-slate-500 uppercase">日期範圍</span>
-                                    <input
-                                        type="date"
-                                        value={invoiceStartDate}
-                                        onChange={(e) => setInvoiceStartDate(e.target.value)}
-                                        className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500"
-                                    />
-                                    <span className="text-slate-400">~</span>
-                                    <input
-                                        type="date"
-                                        value={invoiceEndDate}
-                                        onChange={(e) => setInvoiceEndDate(e.target.value)}
-                                        className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500"
-                                    />
-                                </div>
-
-                                {invoiceSubTab === 'list' && (
-                                    <div className="flex items-center gap-2 ml-auto md:ml-0">
-                                        <span className="text-xs font-semibold text-slate-500 uppercase">支付方式</span>
-                                        <select
-                                            value={invoicePaymentFilter}
-                                            onChange={(e) => setInvoicePaymentFilter(e.target.value)}
-                                            className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500 min-w-[120px]"
+                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
                                         >
-                                            <option value="All">全部</option>
-                                            {paymentMethodOptions.map(p => (
-                                                <option key={p} value={p}>{p}</option>
-                                            ))}
+                                            本月
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const now = new Date();
+                                                const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                                                const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+                                                const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                                setReconStartDate(formatDate(firstDayLastMonth));
+                                                setReconEndDate(formatDate(lastDayLastMonth));
+                                            }}
+                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
+                                        >
+                                            上個月
+                                        </button>
+                                        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+                                            <span className="text-xs text-slate-500">從</span>
+                                            <input
+                                                type="date"
+                                                value={reconStartDate}
+                                                onChange={(e) => setReconStartDate(e.target.value)}
+                                                className="bg-transparent text-sm text-slate-700 outline-none"
+                                            />
+                                            <span className="text-xs text-slate-500">至</span>
+                                            <input
+                                                type="date"
+                                                value={reconEndDate}
+                                                onChange={(e) => setReconEndDate(e.target.value)}
+                                                className="bg-transparent text-sm text-slate-700 outline-none"
+                                            />
+                                        </div>
+                                        <select
+                                            value={reconPaymentMethod}
+                                            onChange={(e) => setReconPaymentMethod(e.target.value)}
+                                            className="bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="一般信用卡">一般信用卡</option>
+                                            <option value="掃碼-全支付">掃碼-全支付</option>
+                                            <option value="掃碼-街口支付">掃碼-街口支付</option>
+                                            <option value="掃碼-LINE Pay">掃碼-LINE Pay</option>
+                                            <option value="掃碼-悠遊付">掃碼-悠遊付</option>
+                                            <option value="電子票證-悠遊卡-小額">電子票證-悠遊卡-小額</option>
+                                            <option value="電子票證-一卡通-小額">電子票證-一卡通-小額</option>
+                                            <option value="掃碼-iPass MONEY">掃碼-iPass MONEY</option>
                                         </select>
+                                        <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm font-medium cursor-pointer hover:bg-blue-700 transition-colors">
+                                            <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handlePlatformUpload} />
+                                            <CloudRain className="w-4 h-4" />
+                                            <span>上傳平台數據</span>
+                                        </label>
                                     </div>
-                                )}
+                                </div>
 
-                                {(invoiceStartDate || invoiceEndDate || invoicePaymentFilter !== 'All') && (
-                                    <button
-                                        onClick={() => {
-                                            setInvoiceStartDate('');
-                                            setInvoiceEndDate('');
-                                            setInvoicePaymentFilter('All');
-                                        }}
-                                        className="ml-auto text-xs text-blue-600 hover:text-blue-800 underline px-2"
-                                    >
-                                        清除篩選
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Content Area */}
-                            {invoiceSubTab === 'list' ? (
-                                <div className="space-y-4">
-                                    <div className="text-right text-xs text-slate-500">
-                                        共 {invoiceTabData.length} 筆資料
+                                {/* Print Header (Visible only when printing) */}
+                                <div className="hidden print:block mb-6 border-b-2 border-slate-800 pb-4">
+                                    <h2 className="text-2xl font-black text-slate-900">對帳明細報表</h2>
+                                    <div className="flex justify-between items-end mt-2">
+                                        <p className="text-slate-600 text-sm">
+                                            對帳區間：<span className="font-bold">{reconStartDate}</span> 至 <span className="font-bold">{reconEndDate}</span>
+                                        </p>
+                                        <p className="text-slate-400 text-xs">列印日期：{new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</p>
                                     </div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                </div>
+
+                                {!platformData.length ? (
+                                    <div className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                                        <div className="p-4 bg-white rounded-full shadow-sm mb-4">
+                                            <CreditCard className="w-10 h-10 text-slate-300" />
+                                        </div>
+                                        <h4 className="text-slate-600 font-medium mb-1">尚未上傳平台數據</h4>
+                                        <p className="text-slate-400 text-sm mb-6">請上傳藍新金流或其他平台的交易報表進行自動比對</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                                        <table className="w-full text-sm text-left border-collapse">
+                                            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-xs">
                                                 <tr>
-                                                    <th className="px-4 py-3">訂單編號</th>
-                                                    <th className="px-4 py-3">發票號碼</th>
-                                                    <th className="px-4 py-3">交易時間</th>
-                                                    <th className="px-4 py-3 text-right">發票金額</th>
-                                                    <th className="px-4 py-3">支付方式</th>
-                                                    <th className="px-4 py-3">備註</th>
+                                                    <th className="px-4 py-3 border-r border-slate-200 bg-slate-100/50" colSpan={4}>系統發票紀錄 (左)</th>
+                                                    <th className="px-4 py-3 text-center border-r border-slate-200 w-24">對帳狀態</th>
+                                                    <th className="px-4 py-3 bg-slate-100/50" colSpan={3}>平台交易數據 (右)</th>
+                                                </tr>
+                                                <tr className="bg-slate-50/80 border-b border-slate-200">
+                                                    <th className="px-4 py-2 font-medium">交易時間</th>
+                                                    <th className="px-4 py-2 font-medium">發票號碼</th>
+                                                    <th className="px-4 py-2 font-medium text-right">金額</th>
+                                                    <th className="px-4 py-2 font-medium border-r border-slate-200">備註</th>
+                                                    <th className="px-4 py-2 text-center border-r border-slate-200">-</th>
+                                                    <th className="px-4 py-2 font-medium">交易時間</th>
+                                                    <th className="px-4 py-2 font-medium">平台序號</th>
+                                                    <th className="px-4 py-2 font-medium text-right">金額</th>
+                                                    <th className="px-4 py-2 text-center w-10">-</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
-                                                {invoiceTabData.length === 0 ? (
-                                                    <tr>
-                                                        <td colSpan={6} className="p-8 text-center text-slate-500">沒有符合條件的發票資料</td>
-                                                    </tr>
-                                                ) : (
-                                                    <InvoiceTablePagination data={invoiceTabData} refundSet={refundSet} />
-                                                )}
+                                                {reconciliationMatches.map((match, idx) => {
+                                                    const isMatched = match.status === 'matched';
+                                                    const sys = match.system;
+                                                    const plat = match.platform;
+
+                                                    return (
+                                                        <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${!isMatched ? 'bg-red-50/30' : ''}`}>
+                                                            {/* System Info */}
+                                                            <td className={`px-4 py-3 text-xs ${(!sys || sys.isSalesReturn) ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                                                {sys ? formatDateInTaipei(sys.date) : '缺失記錄'}
+                                                            </td>
+                                                            <td className={`px-4 py-3 font-mono ${(!sys || sys.isSalesReturn) ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                                {sys?.invoiceNumber || '無發票'}
+                                                            </td>
+                                                            <td className={`px-4 py-3 text-right font-mono font-medium ${(!sys || sys.isSalesReturn) ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                                {sys ? `$${sys.amount.toLocaleString()}` : '-'}
+                                                            </td>
+                                                            <td className={`px-4 py-3 border-r border-slate-200 text-xs ${sys?.isSalesReturn ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
+                                                                {sys?.isSalesReturn ? '銷退' : ''}
+                                                            </td>
+
+                                                            {/* Status Icon */}
+                                                            <td className="px-4 py-3 text-center border-r border-slate-200">
+                                                                {isMatched ? (
+                                                                    <div className="flex flex-col items-center">
+                                                                        <CheckCircle className="w-5 h-5 text-green-500" />
+                                                                        <span className="text-[10px] text-green-600 font-bold mt-1">已對齊</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex flex-col items-center">
+                                                                        <AlertTriangle className="w-5 h-5 text-red-500" />
+                                                                        <span className="text-[10px] text-red-600 font-bold mt-1">未匹配</span>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+
+                                                            {/* Platform Info */}
+                                                            <td className={`px-4 py-3 text-xs ${!plat ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                                                {plat ? formatDateInTaipei(plat.date) : '缺失記錄'}
+                                                            </td>
+                                                            <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? 'text-red-500 font-bold' : 'text-slate-600'}`} title={plat?.txId}>
+                                                                {plat?.txId || '-'}
+                                                            </td>
+                                                            <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                                {plat ? `$${plat.amount.toLocaleString()}` : '-'}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                {plat && (
+                                                                    <button
+                                                                        onClick={() => setInspectedRow(plat.raw)}
+                                                                        className="p-1 hover:bg-slate-200 rounded-md transition-colors text-slate-400 hover:text-blue-600"
+                                                                        title="查看原始數據"
+                                                                    >
+                                                                        <Info className="w-4 h-4" />
+                                                                    </button>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>
-                                </div>
-                            ) : (
-                                // Anomaly Tab Content
-                                <div className="space-y-4">
-                                    {invoiceAnomalyData.length === 0 ? (
-                                        <div className="p-12 text-center text-slate-500 flex flex-col items-center">
-                                            <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
-                                            <p className="text-lg">目前日期範圍內未發現異常斷號</p>
+                                )}
+
+                                {platformData.length > 0 && (
+                                    <div className="mt-6 flex items-center justify-between no-print">
+                                        <button
+                                            onClick={() => window.print()}
+                                            className="flex items-center gap-2 px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-all shadow-lg active:scale-95"
+                                        >
+                                            <Printer className="w-4 h-4" />
+                                            <span>列印對帳狀態</span>
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                setPlatformData([]);
+                                                setIsMatching(false);
+                                            }}
+                                            className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-red-500 font-medium transition-colors text-sm"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            <span>清除目前比對資料</span>
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Raw Data Inspector Modal */}
+                                {inspectedRow && (
+                                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+                                            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                                                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                                    <Info className="w-5 h-5 text-blue-500" />
+                                                    原始數據檢查器 (Platform Row Data)
+                                                </h3>
+                                                <button
+                                                    onClick={() => setInspectedRow(null)}
+                                                    className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+                                                >
+                                                    <X className="w-5 h-5 text-slate-500" />
+                                                </button>
+                                            </div>
+                                            <div className="p-6 overflow-y-auto">
+                                                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                                                    {Object.entries(inspectedRow).map(([key, val]) => (
+                                                        <div key={key} className="border-b border-slate-50 pb-2">
+                                                            <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">{key}</span>
+                                                            <span className="text-sm text-slate-700 font-mono break-all">
+                                                                {typeof val === 'number' && val > 10000000 ? val.toFixed(0) : String(val)}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                                                <button
+                                                    onClick={() => setInspectedRow(null)}
+                                                    className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg"
+                                                >
+                                                    關閉
+                                                </button>
+                                            </div>
                                         </div>
-                                    ) : (
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* Growth Tab */}
+                {
+                    activeTab === 'growth' && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-slate-800">營收成長分析 (MoM / YoY)</h3>
+                                        <p className="text-sm text-slate-500">比較當前月份與上月、去年同期的營收變化</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                        <span className="text-sm font-semibold text-slate-700">2026 年度目標營業額:</span>
+                                        <div className="flex items-center gap-2 relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                                            <input
+                                                type="text"
+                                                value={target2026.toLocaleString()}
+                                                onChange={(e) => {
+                                                    const rawValue = e.target.value.replace(/,/g, '');
+                                                    const numValue = parseInt(rawValue) || 0;
+                                                    setTarget2026(Math.max(0, numValue));
+                                                }}
+                                                className="pl-6 pr-3 py-1.5 w-32 md:w-40 border border-slate-300 rounded-lg text-right font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                            />
+                                        </div>
+                                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${isSavingTarget
+                                            ? 'text-blue-600 bg-blue-50 animate-pulse'
+                                            : 'text-slate-400 bg-slate-100'
+                                            }`}>
+                                            {isSavingTarget ? (
+                                                <>
+                                                    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" />
+                                                    自動儲存中...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle className="w-3 h-3 text-green-500" />
+                                                    已自動儲存
+                                                </>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-slate-500 hidden md:inline">(依 2025 比例自動分配)</span>
+                                    </div>
+                                </div>
+
+                                {/* Pivot Table Style Growth Report */}
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-4 py-3">月份</th>
+                                                <th className="px-4 py-3 text-right">2024年</th>
+                                                <th className="px-4 py-3 text-right">2025年</th>
+                                                <th className="px-4 py-3 text-right bg-blue-50/50 text-blue-800 border-l border-blue-100">2026 目標</th>
+                                                <th className="px-4 py-3 text-right">2026年</th>
+                                                <th className="px-4 py-3 text-right">YoY (26 vs 25)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {yearPivotData.map((row) => (
+                                                <tr key={row.month} className="hover:bg-slate-50/50">
+                                                    <td className="px-4 py-3 font-medium text-slate-700">{row.month}月</td>
+                                                    <td className="px-4 py-3 text-right text-slate-600">
+                                                        {row['2024'] ? `$${new Intl.NumberFormat('en-US').format(row['2024'])}` : '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right text-slate-600">
+                                                        {row['2025'] ? `$${new Intl.NumberFormat('en-US').format(row['2025'])}` : '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right font-mono text-blue-600 bg-blue-50/30 border-l border-blue-100">
+                                                        ${new Intl.NumberFormat('en-US').format(Math.round(row.target2026))}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right font-bold text-slate-800">
+                                                        {row['2026'] ? `$${new Intl.NumberFormat('en-US').format(row['2026'])}` : '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        {row.yoy === null ? '-' : (
+                                                            <span className={`px-2 py-1 rounded text-xs font-bold ${row.yoy > 0 ? 'bg-green-100 text-green-700' :
+                                                                row.yoy < 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                                                                }`}>
+                                                                {row.yoy > 0 ? '+' : ''}{row.yoy.toFixed(1)}%
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-200">
+                                            <tr>
+                                                <td className="px-4 py-3 text-slate-800">年度總計</td>
+                                                <td className="px-4 py-3 text-right text-slate-800">
+                                                    ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r['2024'] || 0), 0))}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-slate-800">
+                                                    ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r['2025'] || 0), 0))}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-blue-800 bg-blue-50/50 border-l border-blue-100">
+                                                    ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r.target2026 || 0), 0))}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-slate-900 border-l border-r border-slate-200 bg-slate-200/50">
+                                                    ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r['2026'] || 0), 0))}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    {(() => {
+                                                        const total2025 = yearPivotData.reduce((sum, r) => sum + (r['2025'] || 0), 0);
+                                                        const total2026 = yearPivotData.reduce((sum, r) => sum + (r['2026'] || 0), 0);
+                                                        if (total2025 === 0) return '-';
+                                                        const yoy = ((total2026 - total2025) / total2025) * 100;
+                                                        return (
+                                                            <span className={`px-2 py-1 rounded text-xs font-bold ${yoy > 0 ? 'bg-green-100 text-green-800' :
+                                                                yoy < 0 ? 'bg-red-100 text-red-800' : 'bg-slate-200 text-slate-700'
+                                                                }`}>
+                                                                {yoy > 0 ? '+' : ''}{yoy.toFixed(1)}%
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* Invoice Tab */}
+                {
+                    activeTab === 'invoice' && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                                {/* Header & Sub-tabs */}
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-slate-800">
+                                            {invoiceSubTab === 'list' ? '發票交易明細' : '異常偵測 (斷號分析)'}
+                                        </h3>
+                                        <p className="text-sm text-slate-500">
+                                            {invoiceSubTab === 'list'
+                                                ? '可透過日期區間與支付方式篩選特定交易'
+                                                : '自動檢測發票號碼連續性 (忽略支付方式篩選)'}
+                                        </p>
+                                    </div>
+
+                                    <div className="flex bg-slate-100 p-1 rounded-lg self-start md:self-auto">
+                                        <button
+                                            onClick={() => setInvoiceSubTab('list')}
+                                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${invoiceSubTab === 'list'
+                                                ? 'bg-white text-blue-600 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            明細列表
+                                        </button>
+                                        <button
+                                            onClick={() => setInvoiceSubTab('anomaly')}
+                                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${invoiceSubTab === 'anomaly'
+                                                ? 'bg-white text-red-600 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            異常偵測
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Filters Toolbar */}
+                                <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-slate-50 rounded-lg">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-semibold text-slate-500 uppercase">日期範圍</span>
+                                        <input
+                                            type="date"
+                                            value={invoiceStartDate}
+                                            onChange={(e) => setInvoiceStartDate(e.target.value)}
+                                            className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500"
+                                        />
+                                        <span className="text-slate-400">~</span>
+                                        <input
+                                            type="date"
+                                            value={invoiceEndDate}
+                                            onChange={(e) => setInvoiceEndDate(e.target.value)}
+                                            className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+
+                                    {invoiceSubTab === 'list' && (
+                                        <div className="flex items-center gap-2 ml-auto md:ml-0">
+                                            <span className="text-xs font-semibold text-slate-500 uppercase">支付方式</span>
+                                            <select
+                                                value={invoicePaymentFilter}
+                                                onChange={(e) => setInvoicePaymentFilter(e.target.value)}
+                                                className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500 min-w-[120px]"
+                                            >
+                                                <option value="All">全部</option>
+                                                {paymentMethodOptions.map(p => (
+                                                    <option key={p} value={p}>{p}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {(invoiceStartDate || invoiceEndDate || invoicePaymentFilter !== 'All') && (
+                                        <button
+                                            onClick={() => {
+                                                setInvoiceStartDate('');
+                                                setInvoiceEndDate('');
+                                                setInvoicePaymentFilter('All');
+                                            }}
+                                            className="ml-auto text-xs text-blue-600 hover:text-blue-800 underline px-2"
+                                        >
+                                            清除篩選
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Content Area */}
+                                {invoiceSubTab === 'list' ? (
+                                    <div className="space-y-4">
+                                        <div className="text-right text-xs text-slate-500">
+                                            共 {invoiceTabData.length} 筆資料
+                                        </div>
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm text-left">
-                                                <thead className="bg-red-50 text-red-800 border-b border-red-100">
+                                                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                                                     <tr>
-                                                        <th className="p-4">年份-月份</th>
-                                                        <th className="p-4">異常類型</th>
-                                                        <th className="p-4">異常描述</th>
-                                                        <th className="p-4">涉及號碼區間</th>
+                                                        <th className="px-4 py-3">訂單編號</th>
+                                                        <th className="px-4 py-3">發票號碼</th>
+                                                        <th className="px-4 py-3">交易時間</th>
+                                                        <th className="px-4 py-3 text-right">發票金額</th>
+                                                        <th className="px-4 py-3">支付方式</th>
+                                                        <th className="px-4 py-3">備註</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
-                                                    {invoiceAnomalyData.map((issue, idx) => (
-                                                        <tr key={idx} className="hover:bg-red-50/30">
-                                                            <td className="p-4 font-medium">{issue.ym}</td>
-                                                            <td className="p-4">
-                                                                <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">{issue.type}</span>
-                                                            </td>
-                                                            <td className="p-4 text-slate-700">{issue.desc}</td>
-                                                            <td className="p-4 font-mono text-xs text-slate-500">{issue.invoices.join(', ')}</td>
+                                                    {invoiceTabData.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan={6} className="p-8 text-center text-slate-500">沒有符合條件的發票資料</td>
                                                         </tr>
-                                                    ))}
+                                                    ) : (
+                                                        <InvoiceTablePagination data={invoiceTabData} refundSet={refundSet} />
+                                                    )}
                                                 </tbody>
                                             </table>
                                         </div>
-                                    )}
-                                </div>
-                            )}
+                                    </div>
+                                ) : (
+                                    // Anomaly Tab Content
+                                    <div className="space-y-4">
+                                        {invoiceAnomalyData.length === 0 ? (
+                                            <div className="p-12 text-center text-slate-500 flex flex-col items-center">
+                                                <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
+                                                <p className="text-lg">目前日期範圍內未發現異常斷號</p>
+                                            </div>
+                                        ) : (
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm text-left">
+                                                    <thead className="bg-red-50 text-red-800 border-b border-red-100">
+                                                        <tr>
+                                                            <th className="p-4">年份-月份</th>
+                                                            <th className="p-4">異常類型</th>
+                                                            <th className="p-4">異常描述</th>
+                                                            <th className="p-4">涉及號碼區間</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {invoiceAnomalyData.map((issue, idx) => (
+                                                            <tr key={idx} className="hover:bg-red-50/30">
+                                                                <td className="p-4 font-medium">{issue.ym}</td>
+                                                                <td className="p-4">
+                                                                    <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">{issue.type}</span>
+                                                                </td>
+                                                                <td className="p-4 text-slate-700">{issue.desc}</td>
+                                                                <td className="p-4 font-mono text-xs text-slate-500">{issue.invoices.join(', ')}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                )
-            }
+                    )
+                }
 
-            {/* 2024 Ops Tab */}
-            {
-                activeTab === 'ops2024' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <AttractionManager
-                            attractions={attractions}
-                            setAttractions={setAttractions}
-                            updateSystemConfig={updateSystemConfig}
-                        />
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-4">
-                                    <h3 className="text-lg font-bold text-slate-800">2024年 每日營收報表</h3>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => handleSaveVisitorStats()}
-                                        disabled={savingVisitors}
-                                        className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
-                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
-                                            }`}
-                                    >
-                                        <Save className="w-4 h-4" />
-                                        <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
-                                    </button>
-                                    <select
-                                        className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-                                        value={ops2024Month}
-                                        onChange={(e) => setOps2024Month(parseInt(e.target.value))}
-                                    >
-                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                                            <option key={m} value={m}>{m} 月</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* KPI Metrics Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                    <h4 className="text-sm font-semibold text-blue-700 mb-1">本月實際業績</h4>
-                                    <div className="text-2xl font-bold text-blue-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2024KPI.actual))}</div>
-                                </div>
-                                <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
-                                    <h4 className="text-sm font-semibold text-pink-700 mb-1">當月體驗人次</h4>
-                                    <div className="text-2xl font-bold text-pink-900">{new Intl.NumberFormat('en-US').format(ops2024KPI.totalVisitors)} 人</div>
-                                </div>
-                                <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
-                                    <h4 className="text-sm font-semibold text-cyan-700 mb-1">人均消費 (ARPU)</h4>
-                                    <div className="text-2xl font-bold text-cyan-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2024KPI.arpu))}</div>
-                                </div>
-                                <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
-                                    <h4 className="text-sm font-semibold text-amber-700 mb-1">達標率</h4>
-                                    <div className="text-2xl font-bold text-amber-900">{ops2024KPI.rate.toFixed(1)}%</div>
-                                </div>
-                            </div>
-
-                            {/* Success/Failure Analysis Section */}
-                            <div className="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
-                                <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    <Info className="w-5 h-5 text-blue-600" />
-                                    2024年 {ops2024Month}月 運營分析
-                                </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-3">
-                                        <div className="flex items-start gap-3">
-                                            <div className="mt-1 p-1 bg-green-100 rounded-full"><CheckCircle className="w-4 h-4 text-green-600" /></div>
-                                            <div>
-                                                <p className="font-bold text-slate-700 text-sm">表現亮點</p>
-                                                <p className="text-xs text-slate-500 leading-relaxed">
-                                                    {ops2024KPI.rate >= 100 ? '本月成功達標，主要受益於假期人流。' : '本月營收主要集中在週末與特定活動期間。'}
-                                                    ARPU 表現為 ${Math.round(ops2024KPI.arpu)}，反映出穩定的客單價。
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <div className="flex items-start gap-3">
-                                            <div className="mt-1 p-1 bg-red-100 rounded-full"><AlertTriangle className="w-4 h-4 text-red-600" /></div>
-                                            <div>
-                                                <p className="font-bold text-slate-700 text-sm">優化空間</p>
-                                                <p className="text-xs text-slate-500 leading-relaxed">
-                                                    {ops2024KPI.rate < 100 ? `達成率僅 ${ops2024KPI.rate.toFixed(1)}%，需檢討平日促銷方案。` : '建議在非尖峰時段進一步提升轉換率。'}
-                                                    觀察到週一休園效應對週二營收的潛發影響。
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <AttractionRankingCard
-                                year={2024}
-                                month={ops2024Month}
-                                granularData={granularData}
+                {/* 2024 Ops Tab */}
+                {
+                    activeTab === 'ops2024' && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <AttractionManager
                                 attractions={attractions}
+                                setAttractions={setAttractions}
+                                updateSystemConfig={updateSystemConfig}
                             />
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center gap-4">
+                                        <h3 className="text-lg font-bold text-slate-800">2024年 每日營收報表</h3>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => handleSaveVisitorStats()}
+                                            disabled={savingVisitors}
+                                            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
+                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
+                                                }`}
+                                        >
+                                            <Save className="w-4 h-4" />
+                                            <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
+                                        </button>
+                                        <select
+                                            className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                                            value={ops2024Month}
+                                            onChange={(e) => setOps2024Month(parseInt(e.target.value))}
+                                        >
+                                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                                <option key={m} value={m}>{m} 月</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
 
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-4 py-3">日期</th>
-                                            <th className="px-4 py-3">星期</th>
-                                            <th className="px-4 py-3 text-right">票務收入</th>
-                                            <th className="px-4 py-3 text-right">包場收入</th>
-                                            <th className="px-4 py-3 text-right">當日收入</th>
-                                            <th className="px-4 py-3 text-right">體驗人次</th>
-                                            <th className="px-4 py-3 text-right">包場人次</th>
-                                            <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
-                                            <th className="px-4 py-3">備註</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {ops2024Data.map((row) => (
-                                            <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
-                                                <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
-                                                <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                                                    {row.weekDay}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-slate-600 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-purple-600 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.revenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <span className="font-bold text-blue-600">{row.visitorCount}</span>
-                                                        <button
-                                                            onClick={() => setEditingGranularDate(row.dateStr)}
-                                                            className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
-                                                            title="點擊編輯各項目明細"
-                                                        >
-                                                            <Edit3 className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
-                                                <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
-                                                    ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <input
-                                                        type="text"
-                                                        value={row.remark}
-                                                        onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
-                                                        placeholder="..."
-                                                        className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-500"
-                                                    />
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+                                {/* KPI Metrics Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                        <h4 className="text-sm font-semibold text-blue-700 mb-1">本月實際業績</h4>
+                                        <div className="text-2xl font-bold text-blue-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2024KPI.actual))}</div>
+                                    </div>
+                                    <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
+                                        <h4 className="text-sm font-semibold text-pink-700 mb-1">當月體驗人次</h4>
+                                        <div className="text-2xl font-bold text-pink-900">{new Intl.NumberFormat('en-US').format(ops2024KPI.totalVisitors)} 人</div>
+                                    </div>
+                                    <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
+                                        <h4 className="text-sm font-semibold text-cyan-700 mb-1">人均消費 (ARPU)</h4>
+                                        <div className="text-2xl font-bold text-cyan-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2024KPI.arpu))}</div>
+                                    </div>
+                                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                                        <h4 className="text-sm font-semibold text-amber-700 mb-1">達標率</h4>
+                                        <div className="text-2xl font-bold text-amber-900">{ops2024KPI.rate.toFixed(1)}%</div>
+                                    </div>
+                                </div>
 
-            {/* 2025 Ops Tab */}
-            {
-                activeTab === 'ops2025' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <AttractionManager
-                            attractions={attractions}
-                            setAttractions={setAttractions}
-                            updateSystemConfig={updateSystemConfig}
-                        />
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-4">
-                                    <h3 className="text-lg font-bold text-slate-800">2025年 每日營收報表</h3>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => handleSaveVisitorStats()}
-                                        disabled={savingVisitors}
-                                        className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
-                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
-                                            }`}
-                                    >
-                                        <Save className="w-4 h-4" />
-                                        <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
-                                    </button>
-                                    <select
-                                        className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-                                        value={ops2025Month}
-                                        onChange={(e) => setOps2025Month(parseInt(e.target.value))}
-                                    >
-                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                                            <option key={m} value={m}>{m} 月</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* KPI Metrics Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                    <h4 className="text-sm font-semibold text-blue-700 mb-1">本月實際業績</h4>
-                                    <div className="text-2xl font-bold text-blue-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2025KPI.actual))}</div>
-                                </div>
-                                <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
-                                    <h4 className="text-sm font-semibold text-pink-700 mb-1">當月體驗人次</h4>
-                                    <div className="text-2xl font-bold text-pink-900">{new Intl.NumberFormat('en-US').format(ops2025KPI.totalVisitors)} 人</div>
-                                </div>
-                                <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
-                                    <h4 className="text-sm font-semibold text-cyan-700 mb-1">人均消費 (ARPU)</h4>
-                                    <div className="text-2xl font-bold text-cyan-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2025KPI.arpu))}</div>
-                                </div>
-                                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                                    <h4 className="text-sm font-semibold text-emerald-700 mb-1">達成率</h4>
-                                    <div className="text-2xl font-bold text-emerald-900">{ops2025KPI.rate.toFixed(1)}%</div>
-                                </div>
-                            </div>
-
-                            <AttractionRankingCard
-                                year={2025}
-                                month={ops2025Month}
-                                granularData={granularData}
-                                attractions={attractions}
-                            />
-
-                            {/* Success/Failure Analysis Section */}
-                            <div className="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
-                                <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    <Info className="w-5 h-5 text-blue-600" />
-                                    2025年 {ops2025Month}月 運營分析
-                                </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-3">
-                                        <div className="flex items-start gap-3">
-                                            <div className="mt-1 p-1 bg-green-100 rounded-full"><CheckCircle className="w-4 h-4 text-green-600" /></div>
-                                            <div>
-                                                <p className="font-bold text-slate-700 text-sm">表現亮點</p>
-                                                <p className="text-xs text-slate-500 leading-relaxed">
-                                                    {ops2025KPI.rate >= 100 ? '本月份展現強勁增長，達成率極高。' : 'ARPU 貢獻穩定，維持在市場平均水準。'}
-                                                    體驗人次穩定突破 {new Intl.NumberFormat('en-US').format(ops2025KPI.totalVisitors)}。
-                                                </p>
+                                {/* Success/Failure Analysis Section */}
+                                <div className="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
+                                    <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <Info className="w-5 h-5 text-blue-600" />
+                                        2024年 {ops2024Month}月 運營分析
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-3">
+                                            <div className="flex items-start gap-3">
+                                                <div className="mt-1 p-1 bg-green-100 rounded-full"><CheckCircle className="w-4 h-4 text-green-600" /></div>
+                                                <div>
+                                                    <p className="font-bold text-slate-700 text-sm">表現亮點</p>
+                                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                                        {ops2024KPI.rate >= 100 ? '本月成功達標，主要受益於假期人流。' : '本月營收主要集中在週末與特定活動期間。'}
+                                                        ARPU 表現為 ${Math.round(ops2024KPI.arpu)}，反映出穩定的客單價。
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <div className="flex items-start gap-3">
-                                            <div className="mt-1 p-1 bg-red-100 rounded-full"><AlertTriangle className="w-4 h-4 text-red-600" /></div>
-                                            <div>
-                                                <p className="font-bold text-slate-700 text-sm">優化空間</p>
-                                                <p className="text-xs text-slate-500 leading-relaxed">
-                                                    {ops2025KPI.rate < 100 ? '部分平日時段業績未如預期，可加強校園折扣方案。' : '達標後應思考如何優化服務流程以應對高人流。'}
-                                                    天氣因素對營收波動影響顯著。
-                                                </p>
+                                        <div className="space-y-3">
+                                            <div className="flex items-start gap-3">
+                                                <div className="mt-1 p-1 bg-red-100 rounded-full"><AlertTriangle className="w-4 h-4 text-red-600" /></div>
+                                                <div>
+                                                    <p className="font-bold text-slate-700 text-sm">優化空間</p>
+                                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                                        {ops2024KPI.rate < 100 ? `達成率僅 ${ops2024KPI.rate.toFixed(1)}%，需檢討平日促銷方案。` : '建議在非尖峰時段進一步提升轉換率。'}
+                                                        觀察到週一休園效應對週二營收的潛發影響。
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-4 py-3">日期</th>
-                                            <th className="px-4 py-3">星期</th>
-                                            <th className="px-4 py-3 text-right">票務收入</th>
-                                            <th className="px-4 py-3 text-right">包場收入</th>
-                                            <th className="px-4 py-3 text-right">當日收入</th>
-                                            <th className="px-4 py-3 text-right">體驗人次</th>
-                                            <th className="px-4 py-3 text-right">包場人次</th>
-                                            <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
-                                            <th className="px-4 py-3">備註</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {ops2025Data.map((row) => (
-                                            <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
-                                                <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
-                                                <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                                                    {row.weekDay}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-slate-600 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-purple-600 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.revenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <span className="font-bold text-blue-600">{row.visitorCount}</span>
-                                                        <button
-                                                            onClick={() => setEditingGranularDate(row.dateStr)}
-                                                            className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
-                                                            title="點擊編輯各項目明細"
-                                                        >
-                                                            <Edit3 className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
-                                                <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
-                                                    ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <input
-                                                        type="text"
-                                                        value={row.remark}
-                                                        onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
-                                                        placeholder="..."
-                                                        className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-500"
-                                                    />
-                                                </td>
+                                <AttractionRankingCard
+                                    year={2024}
+                                    month={ops2024Month}
+                                    granularData={granularData}
+                                    attractions={attractions}
+                                />
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-4 py-3">日期</th>
+                                                <th className="px-4 py-3">星期</th>
+                                                <th className="px-4 py-3 text-right">票務收入</th>
+                                                <th className="px-4 py-3 text-right">包場收入</th>
+                                                <th className="px-4 py-3 text-right">當日收入</th>
+                                                <th className="px-4 py-3 text-right">體驗人次</th>
+                                                <th className="px-4 py-3 text-right">包場人次</th>
+                                                <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
+                                                <th className="px-4 py-3">備註</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* 2026 Ops Tab */}
-            {
-                activeTab === 'ops2026' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <AttractionManager
-                            attractions={attractions}
-                            setAttractions={setAttractions}
-                            updateSystemConfig={updateSystemConfig}
-                        />
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-4">
-                                    <h3 className="text-lg font-bold text-slate-800">2026年 每日營收報表</h3>
-                                    {role !== 'ops' && (
-                                        <span className="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded">唯讀模式 (唯 Ops 可存儲)</span>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => handleSaveVisitorStats()}
-                                        disabled={savingVisitors}
-                                        className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
-                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
-                                            }`}
-                                    >
-                                        <Save className="w-4 h-4" />
-                                        <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
-                                    </button>
-                                    <select
-                                        className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-                                        value={ops2026Month}
-                                        onChange={(e) => setOps2026Month(parseInt(e.target.value))}
-                                    >
-                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                                            <option key={m} value={m}>{m} 月</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* KPI Metrics Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 mb-8">
-                                {/* Card 1: Monthly Target */}
-                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-sm font-semibold text-blue-700">業務目標 ({ops2026Month}月)</h4>
-                                        <TrendingUp className="w-4 h-4 text-blue-500" />
-                                    </div>
-                                    <div className="text-2xl font-bold text-blue-900">
-                                        ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.target))}
-                                    </div>
-                                    <div className="text-xs text-blue-600 mt-1">
-                                        依年度目標佔比分配
-                                    </div>
-                                </div>
-
-                                {/* Card 2: Daily Benchmark */}
-                                <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-sm font-semibold text-purple-700">每日基準業績</h4>
-                                        <Calendar className="w-4 h-4 text-purple-500" />
-                                    </div>
-                                    <div className="text-2xl font-bold text-purple-900">
-                                        ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.benchmark))}
-                                    </div>
-                                    <div className="text-xs text-purple-600 mt-1">
-                                        {ops2026KPI.workingDays} 個工作天 (排除週一)
-                                    </div>
-                                </div>
-
-                                {/* Card 3: Actual Revenue */}
-                                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-sm font-semibold text-emerald-700">本月實際業績</h4>
-                                        <DollarSign className="w-4 h-4 text-emerald-500" />
-                                    </div>
-                                    <div className="text-2xl font-bold text-emerald-900">
-                                        ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.actual))}
-                                    </div>
-                                    <div className="text-xs text-emerald-600 mt-1">
-                                        {ops2026Month}月 營收累計
-                                    </div>
-                                </div>
-
-                                {/* Card 4: Achievement Rate */}
-                                <div className={`p-4 rounded-xl border ${ops2026KPI.rate >= 100 ? 'bg-orange-50 border-orange-100' : 'bg-slate-50 border-slate-200'
-                                    }`}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className={`text-sm font-semibold ${ops2026KPI.rate >= 100 ? 'text-orange-700' : 'text-slate-600'
-                                            }`}>達成率</h4>
-                                        <CheckCircle className={`w-4 h-4 ${ops2026KPI.rate >= 100 ? 'text-orange-500' : 'text-slate-400'
-                                            }`} />
-                                    </div>
-                                    <div className={`text-2xl font-bold ${ops2026KPI.rate >= 100 ? 'text-orange-800' : 'text-slate-800'
-                                        }`}>
-                                        {ops2026KPI.rate.toFixed(1)}%
-                                    </div>
-                                    <div className={`text-xs mt-1 ${ops2026KPI.rate >= 100 ? 'text-orange-600' : 'text-slate-500'
-                                        }`}>
-                                        {ops2026KPI.rate >= 100 ? '已達標' : `還差 ${(100 - ops2026KPI.rate).toFixed(1)}%`}
-                                    </div>
-                                </div>
-
-                                {/* Card 5: Monthly Visitors */}
-                                <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-sm font-semibold text-pink-700">當月體驗人次</h4>
-                                        <Users className="w-4 h-4 text-pink-500" />
-                                    </div>
-                                    <div className="text-2xl font-bold text-pink-900">
-                                        {new Intl.NumberFormat('en-US').format(ops2026KPI.totalVisitors)}
-                                    </div>
-                                    <div className="text-xs text-pink-600 mt-1">
-                                        人
-                                    </div>
-                                </div>
-
-                                {/* Card 6: ARPU */}
-                                <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-sm font-semibold text-cyan-700">人均消費 (ARPU)</h4>
-                                        <TrendingUp className="w-4 h-4 text-cyan-500" />
-                                    </div>
-                                    <div className="text-2xl font-bold text-cyan-900">
-                                        ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.arpu))}
-                                    </div>
-                                    <div className="text-xs text-cyan-600 mt-1">
-                                        平均每人貢獻
-                                    </div>
-                                </div>
-                            </div>
-
-                            <AttractionRankingCard
-                                year={2026}
-                                month={ops2026Month}
-                                granularData={granularData}
-                                attractions={attractions}
-                            />
-
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-4 py-3">日期</th>
-                                            <th className="px-4 py-3">星期</th>
-                                            <th className="px-4 py-3 text-right">票務收入</th>
-                                            <th className="px-4 py-3 text-right">包場收入</th>
-                                            <th className="px-4 py-3 text-right">當日收入</th>
-                                            <th className="px-4 py-3 text-right">體驗人次</th>
-                                            <th className="px-4 py-3 text-right">包場人次</th>
-                                            <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
-                                            <th className="px-4 py-3">備註</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {ops2026Data.map((row) => (
-                                            <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
-                                                <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
-                                                <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                                                    {row.weekDay}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-slate-600 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-purple-600 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.revenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <span className="font-bold text-blue-600">{row.visitorCount}</span>
-                                                        <button
-                                                            onClick={() => setEditingGranularDate(row.dateStr)}
-                                                            className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
-                                                            title="點擊編輯各項目明細"
-                                                        >
-                                                            <Edit3 className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
-                                                <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
-                                                    ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <input
-                                                        type="text"
-                                                        value={row.remark}
-                                                        onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
-                                                        placeholder="..."
-                                                        className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-700 transition-colors placeholder:text-slate-200"
-                                                    />
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Visitor Statistics Tab */}
-            {
-                activeTab === 'visitor_stats' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                <Users className="w-5 h-5 text-blue-600" />
-                                兒童新樂園入園人次統計
-                            </h3>
-
-                            <div className="overflow-x-auto border rounded-lg">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-6 py-3 text-center w-24">月份</th>
-                                            <th className="px-6 py-3 text-right">2024年 入園人次</th>
-                                            <th className="px-6 py-3 text-right">2025年 入園人次</th>
-                                            <th className="px-6 py-3 text-right">2026年 入園人次</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
-                                            const v2024 = visitorData[2024]?.[m] || 0;
-                                            const v2025 = visitorData[2025]?.[m] || 0;
-                                            const v2026 = visitorData[2026]?.[m] || 0;
-
-                                            return (
-                                                <tr key={m} className="hover:bg-slate-50">
-                                                    <td className="px-6 py-4 text-center font-medium text-slate-700">{m}月</td>
-                                                    <td className="px-6 py-4 text-right font-mono text-slate-600">
-                                                        {v2024 > 0 ? new Intl.NumberFormat('en-US').format(v2024) : '-'}
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {ops2024Data.map((row) => (
+                                                <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
+                                                    <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
+                                                    <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                                        {row.weekDay}
                                                     </td>
-                                                    <td className="px-6 py-4 text-right font-mono text-blue-600 font-medium">
-                                                        {v2025 > 0 ? new Intl.NumberFormat('en-US').format(v2025) : '-'}
+                                                    <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                                                        ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
                                                     </td>
-                                                    <td className="px-6 py-4 text-right font-mono text-slate-400">
-                                                        {v2026 > 0 ? new Intl.NumberFormat('en-US').format(v2026) : '-'}
+                                                    <td className="px-4 py-3 text-right text-purple-600 font-mono">
+                                                        ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
+                                                        ${new Intl.NumberFormat('en-US').format(row.revenue)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <span className="font-bold text-blue-600">{row.visitorCount}</span>
+                                                            <button
+                                                                onClick={() => setEditingGranularDate(row.dateStr)}
+                                                                className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
+                                                                title="點擊編輯各項目明細"
+                                                            >
+                                                                <Edit3 className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
+                                                    <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
+                                                        ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <input
+                                                            type="text"
+                                                            value={row.remark}
+                                                            onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
+                                                            placeholder="..."
+                                                            className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-500"
+                                                        />
                                                     </td>
                                                 </tr>
-                                            );
-                                        })}
-                                        {/* Total Row */}
-                                        <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
-                                            <td className="px-6 py-4 text-center text-slate-800">總計</td>
-                                            <td className="px-6 py-4 text-right font-mono text-slate-800">
-                                                {new Intl.NumberFormat('en-US').format(
-                                                    Object.values(visitorData[2024] || {}).reduce((a, b) => a + b, 0)
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-mono text-blue-700">
-                                                {new Intl.NumberFormat('en-US').format(
-                                                    Object.values(visitorData[2025] || {}).reduce((a, b) => a + b, 0)
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-mono text-slate-500">
-                                                {new Intl.NumberFormat('en-US').format(
-                                                    Object.values(visitorData[2026] || {}).reduce((a, b) => a + b, 0)
-                                                )}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div className="mt-4 text-xs text-slate-400 text-right">
-                                資料來源：兒童新樂園入園人次統計表 (PDF)
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )
-            }
-        </div >
-    );
+                    )
+                }
+
+                {/* 2025 Ops Tab */}
+                {
+                    activeTab === 'ops2025' && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <AttractionManager
+                                attractions={attractions}
+                                setAttractions={setAttractions}
+                                updateSystemConfig={updateSystemConfig}
+                            />
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center gap-4">
+                                        <h3 className="text-lg font-bold text-slate-800">2025年 每日營收報表</h3>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => handleSaveVisitorStats()}
+                                            disabled={savingVisitors}
+                                            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
+                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
+                                                }`}
+                                        >
+                                            <Save className="w-4 h-4" />
+                                            <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
+                                        </button>
+                                        <select
+                                            className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                                            value={ops2025Month}
+                                            onChange={(e) => setOps2025Month(parseInt(e.target.value))}
+                                        >
+                                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                                <option key={m} value={m}>{m} 月</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* KPI Metrics Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                        <h4 className="text-sm font-semibold text-blue-700 mb-1">本月實際業績</h4>
+                                        <div className="text-2xl font-bold text-blue-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2025KPI.actual))}</div>
+                                    </div>
+                                    <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
+                                        <h4 className="text-sm font-semibold text-pink-700 mb-1">當月體驗人次</h4>
+                                        <div className="text-2xl font-bold text-pink-900">{new Intl.NumberFormat('en-US').format(ops2025KPI.totalVisitors)} 人</div>
+                                    </div>
+                                    <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
+                                        <h4 className="text-sm font-semibold text-cyan-700 mb-1">人均消費 (ARPU)</h4>
+                                        <div className="text-2xl font-bold text-cyan-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2025KPI.arpu))}</div>
+                                    </div>
+                                    <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                                        <h4 className="text-sm font-semibold text-emerald-700 mb-1">達成率</h4>
+                                        <div className="text-2xl font-bold text-emerald-900">{ops2025KPI.rate.toFixed(1)}%</div>
+                                    </div>
+                                </div>
+
+                                <AttractionRankingCard
+                                    year={2025}
+                                    month={ops2025Month}
+                                    granularData={granularData}
+                                    attractions={attractions}
+                                />
+
+                                {/* Success/Failure Analysis Section */}
+                                <div className="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
+                                    <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <Info className="w-5 h-5 text-blue-600" />
+                                        2025年 {ops2025Month}月 運營分析
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-3">
+                                            <div className="flex items-start gap-3">
+                                                <div className="mt-1 p-1 bg-green-100 rounded-full"><CheckCircle className="w-4 h-4 text-green-600" /></div>
+                                                <div>
+                                                    <p className="font-bold text-slate-700 text-sm">表現亮點</p>
+                                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                                        {ops2025KPI.rate >= 100 ? '本月份展現強勁增長，達成率極高。' : 'ARPU 貢獻穩定，維持在市場平均水準。'}
+                                                        體驗人次穩定突破 {new Intl.NumberFormat('en-US').format(ops2025KPI.totalVisitors)}。
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div className="flex items-start gap-3">
+                                                <div className="mt-1 p-1 bg-red-100 rounded-full"><AlertTriangle className="w-4 h-4 text-red-600" /></div>
+                                                <div>
+                                                    <p className="font-bold text-slate-700 text-sm">優化空間</p>
+                                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                                        {ops2025KPI.rate < 100 ? '部分平日時段業績未如預期，可加強校園折扣方案。' : '達標後應思考如何優化服務流程以應對高人流。'}
+                                                        天氣因素對營收波動影響顯著。
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-4 py-3">日期</th>
+                                                <th className="px-4 py-3">星期</th>
+                                                <th className="px-4 py-3 text-right">票務收入</th>
+                                                <th className="px-4 py-3 text-right">包場收入</th>
+                                                <th className="px-4 py-3 text-right">當日收入</th>
+                                                <th className="px-4 py-3 text-right">體驗人次</th>
+                                                <th className="px-4 py-3 text-right">包場人次</th>
+                                                <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
+                                                <th className="px-4 py-3">備註</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {ops2025Data.map((row) => (
+                                                <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
+                                                    <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
+                                                    <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                                        {row.weekDay}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                                                        ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right text-purple-600 font-mono">
+                                                        ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
+                                                        ${new Intl.NumberFormat('en-US').format(row.revenue)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <span className="font-bold text-blue-600">{row.visitorCount}</span>
+                                                            <button
+                                                                onClick={() => setEditingGranularDate(row.dateStr)}
+                                                                className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
+                                                                title="點擊編輯各項目明細"
+                                                            >
+                                                                <Edit3 className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
+                                                    <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
+                                                        ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <input
+                                                            type="text"
+                                                            value={row.remark}
+                                                            onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
+                                                            placeholder="..."
+                                                            className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-500"
+                                                        />
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* 2026 Ops Tab */}
+                {
+                    activeTab === 'ops2026' && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <AttractionManager
+                                attractions={attractions}
+                                setAttractions={setAttractions}
+                                updateSystemConfig={updateSystemConfig}
+                            />
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center gap-4">
+                                        <h3 className="text-lg font-bold text-slate-800">2026年 每日營收報表</h3>
+                                        {role !== 'ops' && (
+                                            <span className="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded">唯讀模式 (唯 Ops 可存儲)</span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => handleSaveVisitorStats()}
+                                            disabled={savingVisitors}
+                                            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
+                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
+                                                }`}
+                                        >
+                                            <Save className="w-4 h-4" />
+                                            <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
+                                        </button>
+                                        <select
+                                            className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                                            value={ops2026Month}
+                                            onChange={(e) => setOps2026Month(parseInt(e.target.value))}
+                                        >
+                                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                                <option key={m} value={m}>{m} 月</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* KPI Metrics Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 mb-8">
+                                    {/* Card 1: Monthly Target */}
+                                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-sm font-semibold text-blue-700">業務目標 ({ops2026Month}月)</h4>
+                                            <TrendingUp className="w-4 h-4 text-blue-500" />
+                                        </div>
+                                        <div className="text-2xl font-bold text-blue-900">
+                                            ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.target))}
+                                        </div>
+                                        <div className="text-xs text-blue-600 mt-1">
+                                            依年度目標佔比分配
+                                        </div>
+                                    </div>
+
+                                    {/* Card 2: Daily Benchmark */}
+                                    <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-sm font-semibold text-purple-700">每日基準業績</h4>
+                                            <Calendar className="w-4 h-4 text-purple-500" />
+                                        </div>
+                                        <div className="text-2xl font-bold text-purple-900">
+                                            ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.benchmark))}
+                                        </div>
+                                        <div className="text-xs text-purple-600 mt-1">
+                                            {ops2026KPI.workingDays} 個工作天 (排除週一)
+                                        </div>
+                                    </div>
+
+                                    {/* Card 3: Actual Revenue */}
+                                    <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-sm font-semibold text-emerald-700">本月實際業績</h4>
+                                            <DollarSign className="w-4 h-4 text-emerald-500" />
+                                        </div>
+                                        <div className="text-2xl font-bold text-emerald-900">
+                                            ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.actual))}
+                                        </div>
+                                        <div className="text-xs text-emerald-600 mt-1">
+                                            {ops2026Month}月 營收累計
+                                        </div>
+                                    </div>
+
+                                    {/* Card 4: Achievement Rate */}
+                                    <div className={`p-4 rounded-xl border ${ops2026KPI.rate >= 100 ? 'bg-orange-50 border-orange-100' : 'bg-slate-50 border-slate-200'
+                                        }`}>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className={`text-sm font-semibold ${ops2026KPI.rate >= 100 ? 'text-orange-700' : 'text-slate-600'
+                                                }`}>達成率</h4>
+                                            <CheckCircle className={`w-4 h-4 ${ops2026KPI.rate >= 100 ? 'text-orange-500' : 'text-slate-400'
+                                                }`} />
+                                        </div>
+                                        <div className={`text-2xl font-bold ${ops2026KPI.rate >= 100 ? 'text-orange-800' : 'text-slate-800'
+                                            }`}>
+                                            {ops2026KPI.rate.toFixed(1)}%
+                                        </div>
+                                        <div className={`text-xs mt-1 ${ops2026KPI.rate >= 100 ? 'text-orange-600' : 'text-slate-500'
+                                            }`}>
+                                            {ops2026KPI.rate >= 100 ? '已達標' : `還差 ${(100 - ops2026KPI.rate).toFixed(1)}%`}
+                                        </div>
+                                    </div>
+
+                                    {/* Card 5: Monthly Visitors */}
+                                    <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-sm font-semibold text-pink-700">當月體驗人次</h4>
+                                            <Users className="w-4 h-4 text-pink-500" />
+                                        </div>
+                                        <div className="text-2xl font-bold text-pink-900">
+                                            {new Intl.NumberFormat('en-US').format(ops2026KPI.totalVisitors)}
+                                        </div>
+                                        <div className="text-xs text-pink-600 mt-1">
+                                            人
+                                        </div>
+                                    </div>
+
+                                    {/* Card 6: ARPU */}
+                                    <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-sm font-semibold text-cyan-700">人均消費 (ARPU)</h4>
+                                            <TrendingUp className="w-4 h-4 text-cyan-500" />
+                                        </div>
+                                        <div className="text-2xl font-bold text-cyan-900">
+                                            ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.arpu))}
+                                        </div>
+                                        <div className="text-xs text-cyan-600 mt-1">
+                                            平均每人貢獻
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <AttractionRankingCard
+                                    year={2026}
+                                    month={ops2026Month}
+                                    granularData={granularData}
+                                    attractions={attractions}
+                                />
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-4 py-3">日期</th>
+                                                <th className="px-4 py-3">星期</th>
+                                                <th className="px-4 py-3 text-right">票務收入</th>
+                                                <th className="px-4 py-3 text-right">包場收入</th>
+                                                <th className="px-4 py-3 text-right">當日收入</th>
+                                                <th className="px-4 py-3 text-right">體驗人次</th>
+                                                <th className="px-4 py-3 text-right">包場人次</th>
+                                                <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
+                                                <th className="px-4 py-3">備註</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {ops2026Data.map((row) => (
+                                                <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
+                                                    <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
+                                                    <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                                        {row.weekDay}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                                                        ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right text-purple-600 font-mono">
+                                                        ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
+                                                        ${new Intl.NumberFormat('en-US').format(row.revenue)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <span className="font-bold text-blue-600">{row.visitorCount}</span>
+                                                            <button
+                                                                onClick={() => setEditingGranularDate(row.dateStr)}
+                                                                className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
+                                                                title="點擊編輯各項目明細"
+                                                            >
+                                                                <Edit3 className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
+                                                    <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
+                                                        ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <input
+                                                            type="text"
+                                                            value={row.remark}
+                                                            onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
+                                                            placeholder="..."
+                                                            className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-700 transition-colors placeholder:text-slate-200"
+                                                        />
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* Visitor Statistics Tab */}
+                {
+                    activeTab === 'visitor_stats' && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                    <Users className="w-5 h-5 text-blue-600" />
+                                    兒童新樂園入園人次統計
+                                </h3>
+
+                                <div className="overflow-x-auto border rounded-lg">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-6 py-3 text-center w-24">月份</th>
+                                                <th className="px-6 py-3 text-right">2024年 入園人次</th>
+                                                <th className="px-6 py-3 text-right">2025年 入園人次</th>
+                                                <th className="px-6 py-3 text-right">2026年 入園人次</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+                                                const v2024 = visitorData[2024]?.[m] || 0;
+                                                const v2025 = visitorData[2025]?.[m] || 0;
+                                                const v2026 = visitorData[2026]?.[m] || 0;
+
+                                                return (
+                                                    <tr key={m} className="hover:bg-slate-50">
+                                                        <td className="px-6 py-4 text-center font-medium text-slate-700">{m}月</td>
+                                                        <td className="px-6 py-4 text-right font-mono text-slate-600">
+                                                            {v2024 > 0 ? new Intl.NumberFormat('en-US').format(v2024) : '-'}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right font-mono text-blue-600 font-medium">
+                                                            {v2025 > 0 ? new Intl.NumberFormat('en-US').format(v2025) : '-'}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right font-mono text-slate-400">
+                                                            {v2026 > 0 ? new Intl.NumberFormat('en-US').format(v2026) : '-'}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            {/* Total Row */}
+                                            <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
+                                                <td className="px-6 py-4 text-center text-slate-800">總計</td>
+                                                <td className="px-6 py-4 text-right font-mono text-slate-800">
+                                                    {new Intl.NumberFormat('en-US').format(
+                                                        Object.values(visitorData[2024] || {}).reduce((a, b) => a + b, 0)
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-mono text-blue-700">
+                                                    {new Intl.NumberFormat('en-US').format(
+                                                        Object.values(visitorData[2025] || {}).reduce((a, b) => a + b, 0)
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-mono text-slate-500">
+                                                    {new Intl.NumberFormat('en-US').format(
+                                                        Object.values(visitorData[2026] || {}).reduce((a, b) => a + b, 0)
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="mt-4 text-xs text-slate-400 text-right">
+                                    資料來源：兒童新樂園入園人次統計表 (PDF)
+                                </div>
+                            </div>
+                        </div>
+                    );
 }
 
-// --- Sub-Components ---
+                // --- Sub-Components ---
 
-function GranularEntryModal({
-    editingGranularDate,
-    setEditingGranularDate,
-    granularData,
-    setGranularData,
-    attractions
-}: {
-    editingGranularDate: string | null;
+                function GranularEntryModal({
+                    editingGranularDate,
+                    setEditingGranularDate,
+                    granularData,
+                    setGranularData,
+                    attractions
+                }: {
+                    editingGranularDate: string | null;
     setEditingGranularDate: (val: string | null) => void;
-    granularData: any;
+                granularData: any;
     setGranularData: (val: any | ((prev: any) => any)) => void;
-    attractions: string[];
+                attractions: string[];
 }) {
     if (!editingGranularDate) return null;
-    const dateStr = editingGranularDate;
-    const data = granularData[dateStr] || {};
-    const dayAttractions = data.attractions || {};
+                const dateStr = editingGranularDate;
+                const data = granularData[dateStr] || { };
+                const dayAttractions = data.attractions || { };
 
-    return (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
-                <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
-                    <h3 className="font-bold">{dateStr} 細節輸入</h3>
-                    <button onClick={() => setEditingGranularDate(null)} className="hover:bg-white/20 p-1 rounded">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-                <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-                    <div className="space-y-3">
-                        <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                            <Gamepad2 className="w-4 h-4 text-blue-500" /> 遊戲項目體驗人次
-                        </h4>
-                        <div className="grid grid-cols-1 gap-2">
-                            {attractions.map(attr => (
-                                <div key={attr} className="flex items-center justify-between gap-4 p-2 bg-slate-50 rounded border border-slate-100">
-                                    <span className="text-sm text-slate-600">{attr}</span>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={dayAttractions[attr] || ''}
-                                        onChange={(e) => {
-                                            const val = e.target.value.replace(/\D/g, '');
-                                            setGranularData((prev: any) => ({
-                                                ...prev,
-                                                [dateStr]: {
-                                                    ...prev[dateStr],
-                                                    attractions: { ...dayAttractions, [attr]: parseInt(val) || 0 }
-                                                }
-                                            }));
-                                        }}
-                                        className="w-32 text-right bg-white border border-slate-200 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                        placeholder="0"
-                                    />
-                                </div>
-                            ))}
+                return (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+                        <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
+                            <h3 className="font-bold">{dateStr} 細節輸入</h3>
+                            <button onClick={() => setEditingGranularDate(null)} className="hover:bg-white/20 p-1 rounded">
+                                <X className="w-5 h-5" />
+                            </button>
                         </div>
-                    </div>
-
-                    <div className="space-y-4 pt-4 border-t border-slate-100">
-                        <div className="space-y-2">
-                            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                <Users className="w-4 h-4 text-purple-500" /> 包場數據
-                            </h4>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-xs text-slate-400">包場收入</label>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={data.privateEventRevenue || ''}
-                                        onChange={(e: any) => {
-                                            const val = e.target.value.replace(/\D/g, '');
-                                            setGranularData((prev: any) => ({
-                                                ...prev,
-                                                [dateStr]: { ...prev[dateStr], privateEventRevenue: parseInt(val) || 0 }
-                                            }));
-                                        }}
-                                        className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
-                                        placeholder="0"
-                                    />
+                        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                            <div className="space-y-3">
+                                <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <Gamepad2 className="w-4 h-4 text-blue-500" /> 遊戲項目體驗人次
+                                </h4>
+                                <div className="grid grid-cols-1 gap-2">
+                                    {attractions.map(attr => (
+                                        <div key={attr} className="flex items-center justify-between gap-4 p-2 bg-slate-50 rounded border border-slate-100">
+                                            <span className="text-sm text-slate-600">{attr}</span>
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={dayAttractions[attr] || ''}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/\D/g, '');
+                                                    setGranularData((prev: any) => ({
+                                                        ...prev,
+                                                        [dateStr]: {
+                                                            ...prev[dateStr],
+                                                            attractions: { ...dayAttractions, [attr]: parseInt(val) || 0 }
+                                                        }
+                                                    }));
+                                                }}
+                                                className="w-32 text-right bg-white border border-slate-200 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                    ))}
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs text-slate-400">包場人次</label>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={data.privateEventVisitors || ''}
-                                        onChange={(e: any) => {
-                                            const val = e.target.value.replace(/\D/g, '');
-                                            setGranularData((prev: any) => ({
-                                                ...prev,
-                                                [dateStr]: { ...prev[dateStr], privateEventVisitors: parseInt(val) || 0 }
-                                            }));
-                                        }}
-                                        className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
-                                        placeholder="0"
-                                    />
+                            </div>
+
+                            <div className="space-y-4 pt-4 border-t border-slate-100">
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                        <Users className="w-4 h-4 text-purple-500" /> 包場數據
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-slate-400">包場收入</label>
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={data.privateEventRevenue || ''}
+                                                onChange={(e: any) => {
+                                                    const val = e.target.value.replace(/\D/g, '');
+                                                    setGranularData((prev: any) => ({
+                                                        ...prev,
+                                                        [dateStr]: { ...prev[dateStr], privateEventRevenue: parseInt(val) || 0 }
+                                                    }));
+                                                }}
+                                                className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-slate-400">包場人次</label>
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={data.privateEventVisitors || ''}
+                                                onChange={(e: any) => {
+                                                    const val = e.target.value.replace(/\D/g, '');
+                                                    setGranularData((prev: any) => ({
+                                                        ...prev,
+                                                        [dateStr]: { ...prev[dateStr], privateEventVisitors: parseInt(val) || 0 }
+                                                    }));
+                                                }}
+                                                className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-purple-400"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                        <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3">
+                            <button onClick={() => setEditingGranularDate(null)} className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-200 rounded-lg">
+                                確定
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3">
-                    <button onClick={() => setEditingGranularDate(null)} className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-200 rounded-lg">
-                        確定
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
+                );
 }
 
-function AttractionManager({
-    attractions,
-    setAttractions,
-    updateSystemConfig
-}: {
-    attractions: string[];
+                function AttractionManager({
+                    attractions,
+                    setAttractions,
+                    updateSystemConfig
+                }: {
+                    attractions: string[];
     setAttractions: (val: string[]) => void;
     updateSystemConfig: (key: string, val: string) => Promise<any>;
 }) {
     const [newItem, setNewItem] = useState('');
-    return (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4 mb-6">
-            <div className="flex items-center justify-between">
-                <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                    <Settings className="w-4 h-4" /> 遊戲項目管理
-                </h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
-                {attractions.map(a => (
-                    <div key={a} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm group">
-                        {a}
-                        <button onClick={() => {
-                            const newList = attractions.filter(i => i !== a);
-                            setAttractions(newList);
-                            updateSystemConfig('ops_attractions', JSON.stringify(newList));
-                        }} className="hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Trash2 className="w-3 h-3" />
-                        </button>
+                    return (
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4 mb-6">
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                                <Settings className="w-4 h-4" /> 遊戲項目管理
+                            </h3>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {attractions.map(a => (
+                                <div key={a} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm group">
+                                    {a}
+                                    <button onClick={() => {
+                                        const newList = attractions.filter(i => i !== a);
+                                        setAttractions(newList);
+                                        updateSystemConfig('ops_attractions', JSON.stringify(newList));
+                                    }} className="hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Trash2 className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={newItem}
+                                onChange={(e) => setNewItem(e.target.value)}
+                                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="新增項目..."
+                            />
+                            <button
+                                onClick={() => {
+                                    if (newItem) {
+                                        const newList = [...attractions, newItem];
+                                        setAttractions(newList);
+                                        updateSystemConfig('ops_attractions', JSON.stringify(newList));
+                                        setNewItem('');
+                                    }
+                                }}
+                                className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
-                ))}
-            </div>
-            <div className="flex gap-2">
-                <input
-                    type="text"
-                    value={newItem}
-                    onChange={(e) => setNewItem(e.target.value)}
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="新增項目..."
-                />
-                <button
-                    onClick={() => {
-                        if (newItem) {
-                            const newList = [...attractions, newItem];
-                            setAttractions(newList);
-                            updateSystemConfig('ops_attractions', JSON.stringify(newList));
-                            setNewItem('');
-                        }
-                    }}
-                    className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
-                >
-                    <Plus className="w-4 h-4" />
-                </button>
-            </div>
-        </div>
-    );
+                    );
 }
 
-function InvoiceTablePagination({ data, refundSet }: { data: any[], refundSet: Set<string> }) {
+                    function InvoiceTablePagination({data, refundSet}: {data: any[], refundSet: Set<string> }) {
     const [page, setPage] = useState(1);
-    const pageSize = 50;
-    const totalPages = Math.ceil(data.length / pageSize);
+                        const pageSize = 50;
+                        const totalPages = Math.ceil(data.length / pageSize);
 
     useEffect(() => {
-        setPage(1);
+                            setPage(1);
     }, [data.length]);
 
     const currentData = useMemo(() => {
         const sorted = [...data].sort((a, b) => {
             const numA = a.invoiceNumber || '';
-            const numB = b.invoiceNumber || '';
-            if (numA === numB) return new Date(b.date).getTime() - new Date(a.date).getTime();
-            return numA.localeCompare(numB);
+                        const numB = b.invoiceNumber || '';
+                        if (numA === numB) return new Date(b.date).getTime() - new Date(a.date).getTime();
+                        return numA.localeCompare(numB);
         });
-        const start = (page - 1) * pageSize;
-        return sorted.slice(start, start + pageSize);
+                        const start = (page - 1) * pageSize;
+                        return sorted.slice(start, start + pageSize);
     }, [data, page]);
 
-    return (
-        <>
-            {currentData.map((t, idx) => {
-                const hasInvoice = t.invoiceNumber && t.invoiceNumber.trim() !== '' && t.invoiceNumber !== '-';
-                const isRefund = hasInvoice && refundSet.has(t.invoiceNumber);
-                const invoiceStyle = hasInvoice
-                    ? 'font-mono text-slate-700 font-medium group-hover:text-blue-600'
-                    : 'text-red-500 font-bold';
+                        return (
+                        <>
+                            {currentData.map((t, idx) => {
+                                const hasInvoice = t.invoiceNumber && t.invoiceNumber.trim() !== '' && t.invoiceNumber !== '-';
+                                const isRefund = hasInvoice && refundSet.has(t.invoiceNumber);
+                                const invoiceStyle = hasInvoice
+                                    ? 'font-mono text-slate-700 font-medium group-hover:text-blue-600'
+                                    : 'text-red-500 font-bold';
 
-                let remark = '';
-                if (!hasInvoice) remark = '無發票記錄';
-                else if (isRefund) remark = '銷退';
+                                let remark = '';
+                                if (!hasInvoice) remark = '無發票記錄';
+                                else if (isRefund) remark = '銷退';
 
-                return (
-                    <tr key={`${t.orderId}-${idx}`} className="hover:bg-slate-50 transition-colors group">
-                        <td className="px-4 py-3 font-mono text-slate-500 text-xs">
-                            {t.id}
-                        </td>
-                        <td className={`px-4 py-3 ${invoiceStyle} transition-colors`}>
-                            {hasInvoice ? t.invoiceNumber : '無發票記錄'}
-                        </td>
-                        <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                            {formatDateInTaipei(t.date)}
-                        </td>
-                        <td className={`px-4 py-3 text-right font-mono font-medium ${t.amount < 0 ? 'text-red-600' : 'text-slate-700'}`}>
-                            ${t.amount.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                            <span className="bg-slate-100 px-2 py-1 rounded text-xs">{t.paymentMethod || '其他'}</span>
-                        </td>
-                        <td className={`px-4 py-3 text-xs font-bold ${remark === '無發票記錄' ? 'text-red-500' : 'text-slate-500'}`}>
-                            {remark}
-                        </td>
-                    </tr>
-                );
-            })}
-            {totalPages > 1 && (
-                <tr>
-                    <td colSpan={6} className="p-4 border-t border-slate-100 bg-slate-50">
-                        <div className="flex justify-between items-center">
-                            <span className="text-xs text-slate-500">
-                                顯示 {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, data.length)} 筆，共 {data.length} 筆
-                            </span>
-                            <div className="flex space-x-2">
-                                <button
-                                    onClick={() => setPage(Math.max(1, page - 1))}
-                                    disabled={page === 1}
-                                    className="px-3 py-1 bg-white border border-slate-300 rounded text-xs disabled:opacity-50 hover:bg-slate-50"
-                                >
-                                    上一頁
-                                </button>
-                                <span className="text-xs text-slate-600 self-center">
-                                    {page} / {totalPages}
-                                </span>
-                                <button
-                                    onClick={() => setPage(Math.min(totalPages, page + 1))}
-                                    disabled={page === totalPages}
-                                    className="px-3 py-1 bg-white border border-slate-300 rounded text-xs disabled:opacity-50 hover:bg-slate-50"
-                                >
-                                    下一頁
-                                </button>
-                            </div>
-                        </div>
-                    </td>
-                </tr>
-            )}
-        </>
-    );
+                                return (
+                                    <tr key={`${t.orderId}-${idx}`} className="hover:bg-slate-50 transition-colors group">
+                                        <td className="px-4 py-3 font-mono text-slate-500 text-xs">
+                                            {t.id}
+                                        </td>
+                                        <td className={`px-4 py-3 ${invoiceStyle} transition-colors`}>
+                                            {hasInvoice ? t.invoiceNumber : '無發票記錄'}
+                                        </td>
+                                        <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                                            {formatDateInTaipei(t.date)}
+                                        </td>
+                                        <td className={`px-4 py-3 text-right font-mono font-medium ${t.amount < 0 ? 'text-red-600' : 'text-slate-700'}`}>
+                                            ${t.amount.toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-3 text-slate-600">
+                                            <span className="bg-slate-100 px-2 py-1 rounded text-xs">{t.paymentMethod || '其他'}</span>
+                                        </td>
+                                        <td className={`px-4 py-3 text-xs font-bold ${remark === '無發票記錄' ? 'text-red-500' : 'text-slate-500'}`}>
+                                            {remark}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {totalPages > 1 && (
+                                <tr>
+                                    <td colSpan={6} className="p-4 border-t border-slate-100 bg-slate-50">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-slate-500">
+                                                顯示 {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, data.length)} 筆，共 {data.length} 筆
+                                            </span>
+                                            <div className="flex space-x-2">
+                                                <button
+                                                    onClick={() => setPage(Math.max(1, page - 1))}
+                                                    disabled={page === 1}
+                                                    className="px-3 py-1 bg-white border border-slate-300 rounded text-xs disabled:opacity-50 hover:bg-slate-50"
+                                                >
+                                                    上一頁
+                                                </button>
+                                                <span className="text-xs text-slate-600 self-center">
+                                                    {page} / {totalPages}
+                                                </span>
+                                                <button
+                                                    onClick={() => setPage(Math.min(totalPages, page + 1))}
+                                                    disabled={page === totalPages}
+                                                    className="px-3 py-1 bg-white border border-slate-300 rounded text-xs disabled:opacity-50 hover:bg-slate-50"
+                                                >
+                                                    下一頁
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </>
+                        );
 }
 
-function UploadButton() {
+                        function UploadButton() {
     const router = useRouter();
-    const [uploading, setUploading] = useState(false);
+                        const [uploading, setUploading] = useState(false);
 
-    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+                        const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
 
-        const file = e.target.files[0];
-        setUploading(true);
-        const formData = new FormData();
-        formData.append('file', file);
+                            const file = e.target.files[0];
+                            setUploading(true);
+                            const formData = new FormData();
+                            formData.append('file', file);
 
-        try {
+                            try {
             const res = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData
+                                method: 'POST',
+                            body: formData
             });
-            const data = await res.json();
-            if (data.success) {
-                alert(data.message);
-                router.refresh();
+                            const data = await res.json();
+                            if (data.success) {
+                                alert(data.message);
+                            router.refresh();
             } else {
-                alert('上傳失敗: ' + data.error);
+                                alert('上傳失敗: ' + data.error);
             }
         } catch (err) {
-            console.error(err);
-            alert('上傳發生錯誤');
+                                console.error(err);
+                            alert('上傳發生錯誤');
         } finally {
-            setUploading(false);
-            e.target.value = '';
+                                setUploading(false);
+                            e.target.value = '';
         }
     };
 
-    return (
-        <label className={`
+                            return (
+                            <label className={`
             flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm font-medium cursor-pointer transition-colors
             ${uploading ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}
         `}>
-            <input
-                type="file"
-                accept=".xlsx"
-                className="hidden"
-                onChange={handleUpload}
-                disabled={uploading}
-            />
-            {uploading ? (
-                <span>處理中...</span>
-            ) : (
-                <>
-                    <CloudRain className="w-4 h-4" />
-                    <span>上傳報表</span>
-                </>
-            )}
-        </label>
-    );
+                                <input
+                                    type="file"
+                                    accept=".xlsx"
+                                    className="hidden"
+                                    onChange={handleUpload}
+                                    disabled={uploading}
+                                />
+                                {uploading ? (
+                                    <span>處理中...</span>
+                                ) : (
+                                    <>
+                                        <CloudRain className="w-4 h-4" />
+                                        <span>上傳報表</span>
+                                    </>
+                                )}
+                            </label>
+                            );
 }
 
-function Card({ title, value, sub, icon, trend }: any) {
+                            function Card({title, value, sub, icon, trend}: any) {
     return (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between h-full relative overflow-hidden group hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-                <div>
-                    <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">{title}</h4>
-                    <h2 className="text-2xl font-bold text-slate-800 mt-1">{value}</h2>
-                </div>
-                <div className="p-2 bg-slate-50 rounded-lg group-hover:scale-110 transition-transform">
-                    {icon}
-                </div>
-            </div>
-            {sub && (
-                <div className="text-xs text-slate-400 mt-auto pt-2 border-t border-slate-50">
-                    {sub}
-                </div>
-            )}
-        </div>
-    );
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between h-full relative overflow-hidden group hover:shadow-md transition-shadow">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">{title}</h4>
+                                        <h2 className="text-2xl font-bold text-slate-800 mt-1">{value}</h2>
+                                    </div>
+                                    <div className="p-2 bg-slate-50 rounded-lg group-hover:scale-110 transition-transform">
+                                        {icon}
+                                    </div>
+                                </div>
+                                {sub && (
+                                    <div className="text-xs text-slate-400 mt-auto pt-2 border-t border-slate-50">
+                                        {sub}
+                                    </div>
+                                )}
+                            </div>
+                            );
 }
 
-function AttractionRankingCard({
-    month,
-    year,
-    granularData,
-    attractions,
-    title = "遊戲項目熱門排行榜"
-}: {
-    month?: string | number,
-    year?: string | number,
-    granularData: Record<string, any>,
-    attractions: string[],
-    title?: string
+                            function AttractionRankingCard({
+                                month,
+                                year,
+                                granularData,
+                                attractions,
+                                title = "遊戲項目熱門排行榜"
+                            }: {
+                                month ?: string | number,
+                                year ?: string | number,
+                                granularData: Record<string, any>,
+                            attractions: string[],
+                            title?: string
 }) {
     const ranking = useMemo(() => {
-        const totals: Record<string, number> = {};
+        const totals: Record<string, number> = { };
         attractions.forEach(a => totals[a] = 0);
 
         Object.entries(granularData).forEach(([dateStr, g]) => {
             const [y, m] = dateStr.split('-');
-            const yearMatch = !year || year === 'All' || y === String(year);
-            const monthMatch = !month || month === 'All' || parseInt(m) === (typeof month === 'string' ? parseInt(month) : month);
+                            const yearMatch = !year || year === 'All' || y === String(year);
+                            const monthMatch = !month || month === 'All' || parseInt(m) === (typeof month === 'string' ? parseInt(month) : month);
 
-            if (yearMatch && monthMatch) {
-                const itemAttractions = g.attractions || {};
+                            if (yearMatch && monthMatch) {
+                const itemAttractions = g.attractions || { };
                 Object.entries(itemAttractions).forEach(([name, count]) => {
                     if (totals[name] !== undefined) {
-                        totals[name] += (Number(count) || 0);
+                                totals[name] += (Number(count) || 0);
                     }
                 });
             }
         });
 
-        return Object.entries(totals)
-            .map(([name, count]) => ({ name, count }))
+                            return Object.entries(totals)
+            .map(([name, count]) => ({name, count}))
             .filter(item => item.count > 0)
             .sort((a, b) => b.count - a.count);
     }, [month, year, granularData, attractions]);
 
     const maxCount = Math.max(...ranking.map(r => r.count), 1);
 
-    if (ranking.length === 0) return null;
+                            if (ranking.length === 0) return null;
 
-    return (
-        <div className="mb-8 space-y-4">
-            <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-orange-500" />
-                {title}
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {ranking.map((item, index) => (
-                    <div key={item.name} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3 hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-3">
-                                <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${index === 0 ? 'bg-orange-100 text-orange-600' :
-                                    index === 1 ? 'bg-slate-100 text-slate-600' :
-                                        index === 2 ? 'bg-amber-100 text-amber-600' : 'bg-slate-50 text-slate-400'
-                                    }`}>
-                                    {index + 1}
-                                </span>
-                                <span className="font-semibold text-slate-700">{item.name}</span>
+                            return (
+                            <div className="mb-8 space-y-4">
+                                <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                    <TrendingUp className="w-5 h-5 text-orange-500" />
+                                    {title}
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {ranking.map((item, index) => (
+                                        <div key={item.name} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3 hover:shadow-md transition-shadow">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${index === 0 ? 'bg-orange-100 text-orange-600' :
+                                                        index === 1 ? 'bg-slate-100 text-slate-600' :
+                                                            index === 2 ? 'bg-amber-100 text-amber-600' : 'bg-slate-50 text-slate-400'
+                                                        }`}>
+                                                        {index + 1}
+                                                    </span>
+                                                    <span className="font-semibold text-slate-700">{item.name}</span>
+                                                </div>
+                                                <span className="text-sm font-mono text-slate-500 font-bold">
+                                                    {new Intl.NumberFormat('en-US').format(item.count)} <span className="text-xs text-slate-400 font-normal">人次</span>
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-slate-50 rounded-full h-2 overflow-hidden">
+                                                <div
+                                                    className={`h-full transition-all duration-1000 ${index === 0 ? 'bg-orange-500' : 'bg-blue-400'
+                                                        }`}
+                                                    style={{ width: `${(item.count / maxCount) * 100}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                            <span className="text-sm font-mono text-slate-500 font-bold">
-                                {new Intl.NumberFormat('en-US').format(item.count)} <span className="text-xs text-slate-400 font-normal">人次</span>
-                            </span>
-                        </div>
-                        <div className="w-full bg-slate-50 rounded-full h-2 overflow-hidden">
-                            <div
-                                className={`h-full transition-all duration-1000 ${index === 0 ? 'bg-orange-500' : 'bg-blue-400'
-                                    }`}
-                                style={{ width: `${(item.count / maxCount) * 100}%` }}
-                            />
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
+                            );
 }
