@@ -66,6 +66,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     const [ops2026Month, setOps2026Month] = useState<number>(new Date().getFullYear() === 2026 ? new Date().getMonth() + 1 : 1);
     const [weatherData, setWeatherData] = useState<Record<string, { min: number, max: number, code: number }>>({});
     const [remarks, setRemarks] = useState<Record<string, string>>({});
+    const [isFetchingData, setIsFetchingData] = useState(false);
     const [granularData, setGranularData] = useState<Record<string, {
         attractions?: Record<string, number>,
         privateEventRevenue?: number,
@@ -1333,25 +1334,45 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         if (year === 0) return;
 
         const loadMonthData = async () => {
-            const daysInMonth = new Date(year, month, 0).getDate();
-            const newData: Record<string, any> = {};
-            for (let d = 1; d <= daysInMonth; d++) {
-                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                const key = `ops_granular_${dateStr}`;
-                const val = await getSystemConfig(key, '');
-                if (val) {
-                    try {
-                        const parsed = JSON.parse(val);
-                        newData[dateStr] = parsed;
-                        if (parsed.remark) {
-                            setRemarks(prev => ({ ...prev, [dateStr]: parsed.remark }));
+            setIsFetchingData(true);
+            try {
+                const daysInMonth = new Date(year, month, 0).getDate();
+                const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+                // Parallel fetch
+                const results = await Promise.all(days.map(async (d) => {
+                    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const key = `ops_granular_${dateStr}`;
+                    const val = await getSystemConfig(key, '');
+                    return { dateStr, val, key };
+                }));
+
+                const newData: Record<string, any> = {};
+                const newRemarks: Record<string, string> = {};
+
+                results.forEach(({ dateStr, val, key }) => {
+                    if (val) {
+                        try {
+                            const parsed = JSON.parse(val);
+                            newData[dateStr] = parsed;
+                            if (parsed.remark) {
+                                newRemarks[dateStr] = parsed.remark;
+                            }
+                        } catch (e) {
+                            console.error('Parse error for key', key, e);
                         }
-                    } catch (e) {
-                        console.error('Parse error for key', key, e);
                     }
+                });
+
+                setGranularData(prev => ({ ...prev, ...newData }));
+                if (Object.keys(newRemarks).length > 0) {
+                    setRemarks(prev => ({ ...prev, ...newRemarks }));
                 }
+            } catch (err) {
+                console.error("Failed to load granular data", err);
+            } finally {
+                setIsFetchingData(false);
             }
-            setGranularData(prev => ({ ...prev, ...newData }));
         };
         loadMonthData();
     }, [activeTab, ops2024Month, ops2025Month, ops2026Month]);
@@ -1673,7 +1694,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             </div>
 
             {/* Loading Overlay */}
-            {isPending && (
+            {(isPending || isFetchingData) && (
                 <div className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-50 flex items-center justify-center animate-in fade-in duration-200">
                     <div className="bg-white px-6 py-4 rounded-xl shadow-xl border border-slate-100 flex items-center gap-3">
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
