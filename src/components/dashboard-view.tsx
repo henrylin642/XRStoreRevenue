@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useTransition } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, ComposedChart, ReferenceLine, Label
@@ -12,6 +12,7 @@ import {
     Info, Trash2, X, Printer, LogOut, Save, Edit3, Gamepad2, Settings, Plus, BarChart2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { useRouter } from 'next/navigation';
 import { getVisitorStats, getDailyVisitorStats } from '@/lib/visitor-data';
 import { HOLIDAY_DATA_2026, getDailyRemark, isPublicHoliday } from '@/lib/holiday-data-2026';
 import { updateDailyVisitorCount } from '@/app/actions/visitor-actions';
@@ -45,12 +46,76 @@ const formatDateInTaipei = (dateStr: string, includeTime = true) => {
 };
 
 export default function DashboardView({ transactions, session }: DashboardViewProps) {
+    const router = useRouter();
     const role = session?.role || 'admin';
+    const [isPending, startTransition] = useTransition();
     const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2024' | 'ops2025' | 'ops2026' | 'visitor_stats' | 'reconciliation'>(
         role === 'ops' ? 'ops2026' : 'overview'
     );
     const [selectedYear, setSelectedYear] = useState<string>('2026');
     const [selectedMonth, setSelectedMonth] = useState<string>('All');
+
+    const handleTabChange = (tab: any) => {
+        startTransition(() => {
+            setActiveTab(tab);
+        });
+    };
+
+    const [ops2024Month, setOps2024Month] = useState<number>(12); // Default to December for past years
+    const [ops2025Month, setOps2025Month] = useState<number>(12);
+    const [ops2026Month, setOps2026Month] = useState<number>(new Date().getFullYear() === 2026 ? new Date().getMonth() + 1 : 1);
+    const [weatherData, setWeatherData] = useState<Record<string, { min: number, max: number, code: number }>>({});
+    const [remarks, setRemarks] = useState<Record<string, string>>({});
+    const [granularData, setGranularData] = useState<Record<string, {
+        attractions?: Record<string, number>,
+        privateEventRevenue?: number,
+        privateEventVisitors?: number,
+        ticketRevenueOverride?: number
+    }>>({});
+    const [attractions, setAttractions] = useState<string[]>(['F1星軌飆速', '星際謎域', '星際射手', '蛋蛋大逃殺', '銀河追魂']);
+    const [isSavingGranular, setIsSavingGranular] = useState(false);
+    const [editingGranularDate, setEditingGranularDate] = useState<string | null>(null);
+    const [dailyVisitorStats, setDailyVisitorStats] = useState<Record<string, number>>({});
+    const [savingVisitors, setSavingVisitors] = useState(false);
+
+    // Persist state to localStorage
+    useEffect(() => {
+        const savedTab = localStorage.getItem('activeTab');
+        const savedYear = localStorage.getItem('selectedYear');
+        const savedMonth = localStorage.getItem('selectedMonth');
+        const s2024m = localStorage.getItem('ops2024Month');
+        const s2025m = localStorage.getItem('ops2025Month');
+        const s2026m = localStorage.getItem('ops2026Month');
+
+        if (savedTab) setActiveTab(savedTab as any);
+        if (savedYear) setSelectedYear(savedYear);
+        if (savedMonth) setSelectedMonth(savedMonth);
+        if (s2024m) setOps2024Month(parseInt(s2024m));
+        if (s2025m) setOps2025Month(parseInt(s2025m));
+        if (s2026m) setOps2026Month(parseInt(s2026m));
+    }, []);
+
+    useEffect(() => { localStorage.setItem('activeTab', activeTab); }, [activeTab]);
+    useEffect(() => { localStorage.setItem('selectedYear', selectedYear); }, [selectedYear]);
+    useEffect(() => { localStorage.setItem('selectedMonth', selectedMonth); }, [selectedMonth]);
+    useEffect(() => { localStorage.setItem('ops2024Month', ops2024Month.toString()); }, [ops2024Month]);
+    useEffect(() => { localStorage.setItem('ops2025Month', ops2025Month.toString()); }, [ops2025Month]);
+    useEffect(() => { localStorage.setItem('ops2026Month', ops2026Month.toString()); }, [ops2026Month]);
+
+    // Auto-save Granular Data
+    const [isFirstGranularLoad, setIsFirstGranularLoad] = useState(true);
+    useEffect(() => {
+        if (isFirstGranularLoad) {
+            setIsFirstGranularLoad(false);
+            return;
+        }
+        const timer = setTimeout(() => {
+            if (activeTab === 'ops2024' || activeTab === 'ops2025' || activeTab === 'ops2026') {
+                handleSaveVisitorStats(true);
+            }
+        }, 3000);
+        return () => clearTimeout(timer);
+    }, [granularData, remarks]);
 
     // Parse dates once
     const parsedData = useMemo(() => {
@@ -551,24 +616,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
 
     // 2026 Operations Tab Logic (Moved here to depend on pivotData & target2026)
-    const [ops2024Month, setOps2024Month] = useState<number>(12); // Default to December for past years
-    const [ops2025Month, setOps2025Month] = useState<number>(12);
-    const [ops2026Month, setOps2026Month] = useState<number>(new Date().getFullYear() === 2026 ? new Date().getMonth() + 1 : 1);
-    const [weatherData, setWeatherData] = useState<Record<string, { min: number, max: number, code: number }>>({});
-    const [remarks, setRemarks] = useState<Record<string, string>>({});
-    const [granularData, setGranularData] = useState<Record<string, {
-        attractions?: Record<string, number>,
-        privateEventRevenue?: number,
-        privateEventVisitors?: number,
-        ticketRevenueOverride?: number
-    }>>({});
-    const [attractions, setAttractions] = useState<string[]>(['F1星軌飆速', '星際謎域', '星際射手', '蛋蛋大逃殺', '銀河追魂']);
-    const [isSavingGranular, setIsSavingGranular] = useState(false);
-    const [editingGranularDate, setEditingGranularDate] = useState<string | null>(null);
-    const [dailyVisitorStats, setDailyVisitorStats] = useState<Record<string, number>>({});
-    const [savingVisitors, setSavingVisitors] = useState(false);
 
-    const handleSaveVisitorStats = async () => {
+    const handleSaveVisitorStats = async (silent = false) => {
         setSavingVisitors(true);
         try {
             let year = 2026;
@@ -605,10 +654,10 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 const payload = { ...g, remark };
                 await updateSystemConfig(key, JSON.stringify(payload));
             }
-            alert('數據及備註已成功儲存！');
+            if (!silent) alert('數據及備註已成功儲存！');
         } catch (e) {
             console.error(e);
-            alert('儲存失敗');
+            if (!silent) alert('儲存失敗');
         } finally {
             setSavingVisitors(false);
         }
@@ -1623,7 +1672,17 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     icon={<CreditCard className="w-8 h-8 text-purple-500 opacity-80" />} trend="neutral" />
             </div>
 
-            <div className="flex space-x-1 mb-6 border-b border-slate-200 overflow-x-auto">
+            {/* Loading Overlay */}
+            {isPending && (
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-50 flex items-center justify-center animate-in fade-in duration-200">
+                    <div className="bg-white px-6 py-4 rounded-xl shadow-xl border border-slate-100 flex items-center gap-3">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                        <span className="font-bold text-slate-700">數據加載中...</span>
+                    </div>
+                </div>
+            )}
+
+            <div className="flex gap-2 overflow-x-auto pb-2 border-b border-slate-200">
                 {[
                     { id: 'overview', label: '營運總覽', icon: <TrendingUp className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
                     { id: 'growth', label: '營收趨勢', icon: <TrendingUp className="w-4 h-4 mr-2" />, roles: ['admin'] },
@@ -1636,7 +1695,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 ].filter(tab => tab.roles.includes(role)).map((tab) => (
                     <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)}
+                        onClick={() => handleTabChange(tab.id as any)}
                         className={`py-3 px-6 font-medium text-sm flex items-center transition-colors whitespace-nowrap ${activeTab === tab.id
                             ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -2339,7 +2398,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <button
-                                        onClick={handleSaveVisitorStats}
+                                        onClick={() => handleSaveVisitorStats()}
                                         disabled={savingVisitors}
                                         className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
                                             ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
@@ -2504,7 +2563,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <button
-                                        onClick={handleSaveVisitorStats}
+                                        onClick={() => handleSaveVisitorStats()}
                                         disabled={savingVisitors}
                                         className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
                                             ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
@@ -2672,7 +2731,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <button
-                                        onClick={handleSaveVisitorStats}
+                                        onClick={() => handleSaveVisitorStats()}
                                         disabled={savingVisitors}
                                         className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
                                             ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
@@ -3195,6 +3254,7 @@ function InvoiceTablePagination({ data, refundSet }: { data: any[], refundSet: S
 }
 
 function UploadButton() {
+    const router = useRouter();
     const [uploading, setUploading] = useState(false);
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3213,7 +3273,7 @@ function UploadButton() {
             const data = await res.json();
             if (data.success) {
                 alert(data.message);
-                window.location.reload();
+                router.refresh();
             } else {
                 alert('上傳失敗: ' + data.error);
             }
