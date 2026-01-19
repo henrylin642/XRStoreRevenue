@@ -22,6 +22,8 @@ export interface Transaction extends TransactionRecord {
     day?: number;
     hour?: number;
     ym?: string;
+    remark?: string;
+    orderId?: string;
 }
 
 export async function getTransactionsFromCSV(): Promise<Transaction[]> {
@@ -74,7 +76,9 @@ export async function getTransactionsFromCSV(): Promise<Transaction[]> {
         paymentStatus: t.payment_status || '付款成功',
         invoiceStatus: '已開立',
         storeName: 'Unknown',
-        sourceFile: 'database'
+        sourceFile: 'database',
+        remark: t.remark || '',
+        orderId: t.id
     }));
 }
 
@@ -212,7 +216,8 @@ export async function mergeExcelData(fileBuffer: Buffer) {
             amount: amount,
             payment_method: paymentMethod,
             payment_status: paymentStatus,
-            transaction_type: transactionType
+            transaction_type: transactionType,
+            remark: String(row['備註'] || row['Remark'] || '')
         };
     }).filter(r => r !== null);
 

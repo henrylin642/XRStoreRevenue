@@ -9,7 +9,8 @@ import { Transaction } from '@/lib/data-manager';
 import {
     CloudRain, CreditCard, Ticket, DollarSign, Calendar, TrendingUp, AlertTriangle, CheckCircle, Users,
     Thermometer, Sun, Cloud, CloudSnow, CloudLightning, FileText, Smartphone as SmartphoneIcon,
-    Info, Trash2, X, Printer, LogOut, Save, Edit3, Gamepad2, Settings, Plus, BarChart2
+    Info, Trash2, X, Printer, LogOut, Save, Edit3, Gamepad2, Settings, Plus, BarChart2, Megaphone,
+    Mail, MessageSquare, Tag, Zap, Target
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useRouter } from 'next/navigation';
@@ -18,6 +19,7 @@ import { HOLIDAY_DATA_2026, getDailyRemark, isPublicHoliday } from '@/lib/holida
 import { updateDailyVisitorCount } from '@/app/actions/visitor-actions';
 import { getSystemConfig, updateSystemConfig, getSystemConfigsByPattern } from '@/app/actions/config-actions';
 import { OperationsExcelImporter } from './operations-excel-importer';
+import { AiCfoChat } from './ai-cfo-chat';
 
 interface DashboardViewProps {
     transactions: Transaction[];
@@ -50,7 +52,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     const router = useRouter();
     const role = session?.role || 'admin';
     const [isPending, startTransition] = useTransition();
-    const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2024' | 'ops2025' | 'ops2026' | 'visitor_stats' | 'reconciliation'>(
+    const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2024' | 'ops2025' | 'ops2026' | 'visitor_stats' | 'reconciliation' | 'marketing'>(
         role === 'ops' ? 'ops2026' : 'overview'
     );
     const [selectedYear, setSelectedYear] = useState<string>('2026');
@@ -79,6 +81,9 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     const [editingGranularDate, setEditingGranularDate] = useState<string | null>(null);
     const [dailyVisitorStats, setDailyVisitorStats] = useState<Record<string, number>>({});
     const [savingVisitors, setSavingVisitors] = useState(false);
+    const [marketingCampaigns, setMarketingCampaigns] = useState<any[]>([]);
+    const [isSavingMarketing, setIsSavingMarketing] = useState(false);
+    const [showPromoModal, setShowPromoModal] = useState(false);
 
     // Persist state to localStorage
     useEffect(() => {
@@ -175,6 +180,70 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
     // For Pivot Table: Ignore time filters, use all data
     const allValidTransactions = useMemo(() => parsedData.filter(t => t.type === '交易成功' && t.paymentStatus === '付款成功'), [parsedData]);
+
+    // Yearly Pivot Data (Rows: Month 1-12, Cols: Years)
+    const pivotData = useMemo(() => {
+        const map: Record<number, Record<string, number>> = {};
+        // Initialize 1-12 months
+        for (let m = 1; m <= 12; m++) map[m] = {};
+
+        allValidTransactions.forEach(t => {
+            if (!map[t.month]) map[t.month] = {};
+            map[t.month][t.year] = (map[t.month][t.year] || 0) + t.amount;
+        });
+
+        // Fixed years columns as requested or dynamic
+        const years = [2024, 2025, 2026];
+        return { map, years };
+    }, [allValidTransactions]);
+
+    const [target2026, setTarget2026] = useState<number>(5600000);
+    const [isSavingTarget, setIsSavingTarget] = useState(false);
+    const [isFirstLoad, setIsFirstLoad] = useState(true);
+
+    const handleSaveTarget = async (val: number) => {
+        setIsSavingTarget(true);
+        try {
+            await updateSystemConfig('target_2026', val);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSavingTarget(false);
+        }
+    };
+
+    // Auto-save logic (Debounced)
+    useEffect(() => {
+        if (isFirstLoad) {
+            setIsFirstLoad(false);
+            return;
+        }
+        const timer = setTimeout(() => {
+            handleSaveTarget(target2026);
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, [target2026]);
+
+    const yearPivotData = useMemo(() => {
+        let total2025 = 0;
+        for (let m = 1; m <= 12; m++) {
+            total2025 += (pivotData.map[m][2025] || 0);
+        }
+        return Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+            const r2024 = pivotData.map[m][2024] || 0;
+            const r2025 = pivotData.map[m][2025] || 0;
+            const r2026 = pivotData.map[m][2026] || 0;
+            let target = 0;
+            if (total2025 > 0) {
+                target = (r2025 / total2025) * target2026;
+            }
+            let yoy = null;
+            if (r2025 > 0) {
+                yoy = ((r2026 - r2025) / r2025) * 100;
+            }
+            return { month: m, '2024': r2024, '2025': r2025, '2026': r2026, target2026: target, yoy };
+        });
+    }, [pivotData, target2026]);
 
     // Basic Stats
     // Basic Stats
@@ -276,6 +345,28 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
         const totalActualCumulative = trendData.length > 0 ? trendData[trendData.length - 1].cumulativeRevenue : 0;
 
+        // Add Target data based on yearPivotData
+        const targetDataMap: Record<number, number> = {};
+        yearPivotData.forEach(r => targetDataMap[r.month] = r.target2026);
+
+        trendData = trendData.map(d => {
+            const dateObj = new Date(d.date);
+            const m = dateObj.getMonth() + 1;
+            const monthlyTarget = targetDataMap[m] || 0;
+            let targetValue = 0;
+
+            if (granularity === 'day') {
+                const daysInMonth = new Date(dateObj.getFullYear(), m, 0).getDate();
+                targetValue = monthlyTarget / daysInMonth;
+            } else if (granularity === 'week') {
+                targetValue = monthlyTarget / 4.345;
+            } else {
+                targetValue = monthlyTarget;
+            }
+
+            return { ...d, target: Math.round(targetValue) };
+        });
+
         // Hourly (unchanged)
         const hourlyMap: Record<number, number> = {};
         for (let i = 0; i < 24; i++) hourlyMap[i] = 0;
@@ -288,7 +379,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         const hourlyData = Object.entries(hourlyMap).map(([h, v]) => ({ hour: `${h}:00`, revenue: v }));
 
         return { totalRevenue, totalTx, avgTicket, paymentMethods, dailyData, trendData, hourlyData, totalActualCumulative };
-    }, [validTransactions, selectedYear, selectedMonth, granularity]);
+    }, [validTransactions, selectedYear, selectedMonth, granularity, yearPivotData]);
 
     // Growth Analysis (MoM, YoY)
     const growthStats = useMemo(() => {
@@ -494,79 +585,6 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
 
 
-    // Yearly Pivot Data (Rows: Month 1-12, Cols: Years)
-    const pivotData = useMemo(() => {
-        const map: Record<number, Record<string, number>> = {};
-        // Initialize 1-12 months
-        for (let m = 1; m <= 12; m++) map[m] = {};
-
-        allValidTransactions.forEach(t => {
-            if (!map[t.month]) map[t.month] = {};
-            map[t.month][t.year] = (map[t.month][t.year] || 0) + t.amount;
-        });
-
-        // Fixed years columns as requested or dynamic
-        // User requested cols: Month, 2024, 2025, 2026, YoY
-        const years = [2024, 2025, 2026];
-
-        return { map, years };
-    }, [allValidTransactions]);
-
-    const [target2026, setTarget2026] = useState<number>(5600000);
-    const [isSavingTarget, setIsSavingTarget] = useState(false);
-    const [isFirstLoad, setIsFirstLoad] = useState(true);
-
-    const handleSaveTarget = async (val: number) => {
-        setIsSavingTarget(true);
-        try {
-            await updateSystemConfig('target_2026', val);
-            // Optionally show a subtle success indicator instead of alert for auto-save
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setIsSavingTarget(false);
-        }
-    };
-
-    // Auto-save logic (Debounced)
-    useEffect(() => {
-        if (isFirstLoad) {
-            setIsFirstLoad(false);
-            return;
-        }
-
-        const timer = setTimeout(() => {
-            handleSaveTarget(target2026);
-        }, 1000); // Wait for 1 second of inactivity
-
-        return () => clearTimeout(timer);
-    }, [target2026]);
-
-    const yearPivotData = useMemo(() => {
-        // Calculate Total 2025 Revenue first to determine proportions
-        let total2025 = 0;
-        for (let m = 1; m <= 12; m++) {
-            total2025 += (pivotData.map[m][2025] || 0);
-        }
-
-        return Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
-            const r2024 = pivotData.map[m][2024] || 0;
-            const r2025 = pivotData.map[m][2025] || 0;
-            const r2026 = pivotData.map[m][2026] || 0;
-
-            // Calculate 2026 Target based on 2025 proportion
-            let target = 0;
-            if (total2025 > 0) {
-                target = (r2025 / total2025) * target2026;
-            }
-
-            let yoy = null;
-            if (r2025 > 0) {
-                yoy = ((r2026 - r2025) / r2025) * 100;
-            }
-            return { month: m, '2024': r2024, '2025': r2025, '2026': r2026, target2026: target, yoy };
-        });
-    }, [pivotData, target2026]);
 
     const receivableTarget = useMemo(() => {
         if (selectedYear !== '2026') return 0;
@@ -1417,6 +1435,24 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         loadData();
     }, [activeTab, ops2024Month, ops2025Month, ops2026Month, selectedYear, selectedMonth]);
 
+    const campaignStats = useMemo(() => {
+        const statsMap: Record<string, { used: number, revenue: number }> = {};
+        marketingCampaigns.forEach(c => statsMap[c.code] = { used: 0, revenue: 0 });
+
+        allValidTransactions.forEach(t => {
+            const remark = (t.remark || '').toUpperCase();
+            const orderId = (t.orderId || '').toUpperCase();
+            marketingCampaigns.forEach(c => {
+                const code = c.code.toUpperCase();
+                if (remark.includes(code) || orderId.includes(code)) {
+                    statsMap[c.code].used += 1;
+                    statsMap[c.code].revenue += t.amount;
+                }
+            });
+        });
+        return statsMap;
+    }, [allValidTransactions, marketingCampaigns]);
+
     // Calculate aggregated stats for Overview Cards
     const overviewStats = useMemo(() => {
         let totalVisitors = 0;
@@ -1455,7 +1491,29 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 setTimeout(() => setIsFirstLoad(true), 0);
             }
         });
+
+        // Initialize marketing campaigns
+        getSystemConfig('marketing_campaigns', '[]').then(val => {
+            if (val) {
+                try {
+                    setMarketingCampaigns(JSON.parse(val));
+                } catch (e) {
+                    console.error('Failed to parse marketing campaigns:', e);
+                }
+            }
+        });
     }, []);
+
+    const handleSaveMarketingCampaigns = async (campaigns: any[]) => {
+        setIsSavingMarketing(true);
+        try {
+            await updateSystemConfig('marketing_campaigns', JSON.stringify(campaigns));
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSavingMarketing(false);
+        }
+    };
 
     const ops2024Data = useMemo(() => {
         const year = 2024;
@@ -1801,6 +1859,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     { id: 'ops2026', label: '2026年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
                     { id: 'visitor_stats', label: '訪客統計', icon: <Users className="w-4 h-4 mr-2" />, roles: ['admin'] },
                     { id: 'reconciliation', label: '對帳中心', icon: <DollarSign className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
+                    { id: 'marketing', label: '行銷中心', icon: <Megaphone className="w-4 h-4 mr-2" />, roles: ['admin', 'ops'] },
                 ].filter(tab => tab.roles.includes(role)).map((tab) => (
                     <button
                         key={tab.id}
@@ -1883,9 +1942,16 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             <ReferenceLine yAxisId="left" y={beValue} stroke="#ef4444" strokeDasharray="3 3">
                                                 <Label value="損益兩平線" position="insideTopLeft" fill="#ef4444" fontSize={10} offset={5} />
                                             </ReferenceLine>
-                                            <ReferenceLine yAxisId="left" y={chartTargetValue} stroke="#10b981" strokeDasharray="3 3">
-                                                <Label value="目標業績線" position="insideTopLeft" fill="#10b981" fontSize={10} offset={5} />
-                                            </ReferenceLine>
+                                            <Line
+                                                yAxisId="left"
+                                                type="monotone"
+                                                dataKey="target"
+                                                name="目標預測線"
+                                                stroke="#10b981"
+                                                strokeWidth={2}
+                                                strokeDasharray="5 5"
+                                                dot={false}
+                                            />
                                         </ComposedChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -3101,6 +3167,239 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     </div>
                 )
             }
+
+            {
+                activeTab === 'marketing' && (
+                    <div className="space-y-6 animate-in fade-in duration-500">
+                        {/* Marketing Strategy Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-2xl text-white shadow-lg">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="bg-white/20 p-2 rounded-lg"><Target className="w-6 h-6" /></div>
+                                    <h3 className="font-bold">校外教學轉化模式</h3>
+                                </div>
+                                <p className="text-sm text-indigo-100 mb-4">針對低預算學生族群，採取「班級對抗賽」與「多人同行優惠」。</p>
+                                <div className="flex justify-between items-end">
+                                    <span className="text-xs bg-white/20 px-2 py-1 rounded">建議折扣: 75折</span>
+                                    <button className="text-xs font-bold underline">查看方案細節</button>
+                                </div>
+                            </div>
+                            <div className="bg-gradient-to-br from-orange-400 to-rose-500 p-6 rounded-2xl text-white shadow-lg">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="bg-white/20 p-2 rounded-lg"><Users className="w-6 h-6" /></div>
+                                    <h3 className="font-bold">10歲以下家庭引流</h3>
+                                </div>
+                                <p className="text-sm text-orange-100 mb-4">提供「AR 觀戰模式」與幼童親手贈品，解決無法戴頭盔的痛點。</p>
+                                <div className="flex justify-between items-end">
+                                    <span className="text-xs bg-white/20 px-2 py-1 rounded">建議方案: 贈送貼紙</span>
+                                    <button className="text-xs font-bold underline">查看方案細節</button>
+                                </div>
+                            </div>
+                            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-6 rounded-2xl text-white shadow-lg">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="bg-white/20 p-2 rounded-lg"><Zap className="w-6 h-6" /></div>
+                                    <h3 className="font-bold">美食街等餐經濟</h3>
+                                </div>
+                                <p className="text-sm text-emerald-100 mb-4">與 2F 美食街合辦「等餐 10 分鐘，XR 現折 50 元」活。活水引流。</p>
+                                <div className="flex justify-between items-end">
+                                    <span className="text-xs bg-white/20 px-2 py-1 rounded">目標轉化: +15%</span>
+                                    <button className="text-xs font-bold underline">查看方案細節</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Campaign Management */}
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <Tag className="w-5 h-5 text-blue-600" />
+                                    當前行銷活動管理
+                                </h3>
+                                <button
+                                    onClick={() => setShowPromoModal(true)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-all"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    新增促銷代碼
+                                </button>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-6 py-4">活動名稱</th>
+                                            <th className="px-6 py-4">促銷代碼</th>
+                                            <th className="px-6 py-4">類型</th>
+                                            <th className="px-6 py-4 text-right">已使用</th>
+                                            <th className="px-6 py-4 text-right">轉化額</th>
+                                            <th className="px-6 py-4">狀態</th>
+                                            <th className="px-6 py-4 text-right">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {marketingCampaigns.length === 0 ? (
+                                            <tr>
+                                                <td className="px-6 py-8 text-center text-slate-400" colSpan={7}>目前無進行中的行銷活動。點擊上方按鈕新增。</td>
+                                            </tr>
+                                        ) : (
+                                            marketingCampaigns.map((c, idx) => {
+                                                const stats = campaignStats[c.code] || { used: 0, revenue: 0 };
+                                                const isActive = new Date() >= new Date(c.startDate) && (!c.endDate || new Date() <= new Date(c.endDate));
+
+                                                return (
+                                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="px-6 py-4 font-medium text-slate-800">{c.name}</td>
+                                                        <td className="px-6 py-4">
+                                                            <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded text-xs font-mono font-bold border border-blue-100 uppercase">
+                                                                {c.code}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-slate-600">{c.type === 'discount' ? '折扣碼' : '贈品方案'}</td>
+                                                        <td className="px-6 py-4 text-right font-mono font-bold text-blue-600">{stats.used} 次</td>
+                                                        <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600">${stats.revenue.toLocaleString()}</td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
+                                                                <span className={`text-xs ${isActive ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
+                                                                    {isActive ? '進行中' : '已結束'}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <button
+                                                                onClick={() => {
+                                                                    const newList = marketingCampaigns.filter((_, i) => i !== idx);
+                                                                    setMarketingCampaigns(newList);
+                                                                    handleSaveMarketingCampaigns(newList);
+                                                                }}
+                                                                className="text-slate-300 hover:text-red-500 transition-colors"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {showPromoModal && (
+                            <PromoCodeModal
+                                onClose={() => setShowPromoModal(false)}
+                                onSave={(newCampaign) => {
+                                    const newList = [...marketingCampaigns, newCampaign];
+                                    setMarketingCampaigns(newList);
+                                    handleSaveMarketingCampaigns(newList);
+                                    setShowPromoModal(false);
+                                }}
+                            />
+                        )}
+                    </div>
+                )
+            }
+
+            {/* AI CFO Chatbot */}
+            <AiCfoChat
+                dataContext={{
+                    stats,
+                    overviewStats,
+                    selectedYear,
+                    selectedMonth,
+                    yearPivotData,
+                    growthStats,
+                    target2026,
+                    marketingCampaigns,
+                    sampleGranular: Object.entries(granularData).slice(0, 5).map(([k, v]) => ({ date: k, ...v as any }))
+                }}
+            />
+        </div>
+    );
+}
+
+function PromoCodeModal({ onClose, onSave }: { onClose: () => void, onSave: (c: any) => void }) {
+    const [formData, setFormData] = useState({
+        name: '',
+        code: '',
+        type: 'discount',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: ''
+    });
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+                <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
+                    <h3 className="font-bold flex items-center gap-2">
+                        <Tag className="w-5 h-5" />
+                        新增行銷促銷活動
+                    </h3>
+                    <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-lg transition-colors">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">活動名稱</label>
+                        <input
+                            type="text"
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="例如：2026 暑期校外教學優惠"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">促銷代碼 (比對備註或單號)</label>
+                        <input
+                            type="text"
+                            value={formData.code}
+                            onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono uppercase"
+                            placeholder="SUMMER2026"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">類型</label>
+                            <select
+                                value={formData.type}
+                                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                            >
+                                <option value="discount">折扣碼</option>
+                                <option value="gift">贈品方案</option>
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">開始日期</label>
+                            <input
+                                type="date"
+                                value={formData.startDate}
+                                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3">
+                    <button onClick={onClose} className="px-6 py-2 text-sm font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition-colors">
+                        取消
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (formData.name && formData.code) onSave(formData);
+                            else alert('請填寫完整資訊');
+                        }}
+                        className="bg-blue-600 text-white px-8 py-2 rounded-xl text-sm font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95"
+                    >
+                        儲存活動
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
