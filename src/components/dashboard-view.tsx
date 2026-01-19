@@ -105,16 +105,22 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
     // Auto-save Granular Data
     const [isFirstGranularLoad, setIsFirstGranularLoad] = useState(true);
+    const isHydrating = React.useRef(false);
+
     useEffect(() => {
         if (isFirstGranularLoad) {
             setIsFirstGranularLoad(false);
             return;
         }
+        if (isHydrating.current) {
+            // Skip auto-save during data hydration
+            return;
+        }
+
         const timer = setTimeout(() => {
-            if (activeTab === 'ops2024' || activeTab === 'ops2025' || activeTab === 'ops2026') {
-                handleSaveVisitorStats(true);
-            }
-        }, 3000);
+            handleSaveVisitorStats(true);
+        }, 3000); // 3 seconds debounce
+
         return () => clearTimeout(timer);
     }, [granularData, remarks]);
 
@@ -1335,6 +1341,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
         const loadMonthData = async () => {
             setIsFetchingData(true);
+            isHydrating.current = true;
             try {
                 const daysInMonth = new Date(year, month, 0).getDate();
                 const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -1368,8 +1375,15 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 if (Object.keys(newRemarks).length > 0) {
                     setRemarks(prev => ({ ...prev, ...newRemarks }));
                 }
+
+                // Reset hydration flag after render
+                setTimeout(() => {
+                    isHydrating.current = false;
+                }, 100);
+
             } catch (err) {
                 console.error("Failed to load granular data", err);
+                isHydrating.current = false;
             } finally {
                 setIsFetchingData(false);
             }
