@@ -2399,13 +2399,20 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                 <p className="font-bold text-slate-700 text-sm">優化空間</p>
                                                 <p className="text-xs text-slate-500 leading-relaxed">
                                                     {ops2024KPI.rate < 100 ? `達成率僅 ${ops2024KPI.rate.toFixed(1)}%，需檢討平日促銷方案。` : '建議在非尖峰時段進一步提升轉換率。'}
-                                                    觀察到週一休園效應對週二營收的潛在影響。
+                                                    觀察到週一休園效應對週二營收的潛發影響。
                                                 </p>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+
+                            <AttractionRankingCard
+                                year={2024}
+                                month={ops2024Month}
+                                granularData={granularData}
+                                attractions={attractions}
+                            />
 
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-left">
@@ -2530,6 +2537,13 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                     <div className="text-2xl font-bold text-emerald-900">{ops2025KPI.rate.toFixed(1)}%</div>
                                 </div>
                             </div>
+
+                            <AttractionRankingCard
+                                year={2025}
+                                month={ops2025Month}
+                                granularData={granularData}
+                                attractions={attractions}
+                            />
 
                             {/* Success/Failure Analysis Section */}
                             <div className="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
@@ -2764,6 +2778,13 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 </div>
                             </div>
 
+                            <AttractionRankingCard
+                                year={2026}
+                                month={ops2026Month}
+                                granularData={granularData}
+                                attractions={attractions}
+                            />
+
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
@@ -2900,7 +2921,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     </div>
                 )
             }
-        </div>
+        </div >
     );
 }
 
@@ -3238,6 +3259,80 @@ function Card({ title, value, sub, icon, trend }: any) {
                     {sub}
                 </div>
             )}
+        </div>
+    );
+}
+
+function AttractionRankingCard({
+    month,
+    year,
+    granularData,
+    attractions
+}: {
+    month: number,
+    year: number,
+    granularData: Record<string, any>,
+    attractions: string[]
+}) {
+    const ranking = useMemo(() => {
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const totals: Record<string, number> = {};
+        attractions.forEach(a => totals[a] = 0);
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const g = granularData[dateStr] || {};
+            const itemAttractions = g.attractions || {};
+            Object.entries(itemAttractions).forEach(([name, count]) => {
+                if (totals[name] !== undefined) {
+                    totals[name] += (Number(count) || 0);
+                }
+            });
+        }
+
+        return Object.entries(totals)
+            .map(([name, count]) => ({ name, count }))
+            .filter(item => item.count > 0)
+            .sort((a, b) => b.count - a.count);
+    }, [month, year, granularData, attractions]);
+
+    const maxCount = Math.max(...ranking.map(r => r.count), 1);
+
+    if (ranking.length === 0) return null;
+
+    return (
+        <div className="mb-8 space-y-4">
+            <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-orange-500" />
+                遊戲項目熱門排行榜
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {ranking.map((item, index) => (
+                    <div key={item.name} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3 hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${index === 0 ? 'bg-orange-100 text-orange-600' :
+                                    index === 1 ? 'bg-slate-100 text-slate-600' :
+                                        index === 2 ? 'bg-amber-100 text-amber-600' : 'bg-slate-50 text-slate-400'
+                                    }`}>
+                                    {index + 1}
+                                </span>
+                                <span className="font-semibold text-slate-700">{item.name}</span>
+                            </div>
+                            <span className="text-sm font-mono text-slate-500 font-bold">
+                                {new Intl.NumberFormat('en-US').format(item.count)} <span className="text-xs text-slate-400 font-normal">人次</span>
+                            </span>
+                        </div>
+                        <div className="w-full bg-slate-50 rounded-full h-2 overflow-hidden">
+                            <div
+                                className={`h-full transition-all duration-1000 ${index === 0 ? 'bg-orange-500' : 'bg-blue-400'
+                                    }`}
+                                style={{ width: `${(item.count / maxCount) * 100}%` }}
+                            />
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
