@@ -1,6 +1,7 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 import { useState, useEffect, useRef } from 'react';
 import { MessageCircle, X, Send, Bot, User, ChevronDown, Minimize2, Maximize2 } from 'lucide-react';
 
@@ -13,19 +14,35 @@ export function AiCfoChat({ dataContext }: AiCfoChatProps) {
     const [isMinimized, setIsMinimized] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-        api: '/api/chat',
-        body: {
-            dataContext,
-        },
-        initialMessages: [
+    const [input, setInput] = useState('');
+    const { messages, sendMessage, status } = useChat({
+        transport: new DefaultChatTransport({
+            api: '/api/chat',
+            body: {
+                dataContext,
+            },
+        }),
+        messages: [
             {
                 id: 'welcome',
                 role: 'assistant',
-                content: '您好！我是您的 AI 財務顧問。我已經分析了當前的營運數據，有什麼我可以幫您的嗎？您可以詢問營收趨勢、目標達成率或是轉化策略建議。',
+                parts: [{ type: 'text', text: '您好！我是您的 AI 財務顧問。我已經分析了當前的營運數據，有什麼我可以幫您的嗎？您可以詢問營收趨勢、目標達成率或是轉化策略建議。' }],
             },
         ],
     });
+
+    const isLoading = status === 'submitted' || status === 'streaming';
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setInput(e.target.value);
+    };
+
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!input.trim() || isLoading) return;
+        sendMessage({ text: input });
+        setInput('');
+    };
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -100,7 +117,10 @@ export function AiCfoChat({ dataContext }: AiCfoChatProps) {
                                         ? 'bg-blue-600 text-white rounded-tr-none'
                                         : 'bg-white border border-slate-200 text-slate-700 shadow-sm rounded-tl-none prose prose-sm max-w-none'
                                         }`}>
-                                        {m.content}
+                                        {m.parts.map((part: any, i: number) => {
+                                            if (part.type === 'text') return <div key={i}>{part.text}</div>;
+                                            return null;
+                                        })}
                                     </div>
                                 </div>
                             </div>
