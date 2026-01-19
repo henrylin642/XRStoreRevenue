@@ -1773,7 +1773,10 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     sub={`達成率: ${receivableTarget > 0 ? ((stats.totalActualCumulative / receivableTarget) * 100).toFixed(1) : 0}%`}
                     icon={<CheckCircle className="w-8 h-8 text-blue-500 opacity-80" />} />
 
-                icon={<CreditCard className="w-8 h-8 text-pink-500 opacity-80" />} />
+                <Card title="平均客單價 (ATV)"
+                    value={`$${stats.totalTx > 0 ? Math.round(stats.totalRevenue / stats.totalTx).toLocaleString() : 0}`}
+                    sub="每筆訂單平均"
+                    icon={<CreditCard className="w-8 h-8 text-pink-500 opacity-80" />} />
             </div>
 
             {/* Loading Overlay */}
