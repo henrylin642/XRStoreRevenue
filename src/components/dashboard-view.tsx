@@ -1330,25 +1330,40 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     }, []);
 
     // Load granular data for the current active month
+    // Load granular data for the current active month OR overview
     useEffect(() => {
         let year = 0;
-        let month = 0;
-        if (activeTab === 'ops2024') { year = 2024; month = ops2024Month; }
-        else if (activeTab === 'ops2025') { year = 2025; month = ops2025Month; }
-        else if (activeTab === 'ops2026') { year = 2026; month = ops2026Month; }
+        let monthsToLoad: number[] = [];
 
-        if (year === 0) return;
+        if (activeTab === 'ops2024') { year = 2024; monthsToLoad = [ops2024Month]; }
+        else if (activeTab === 'ops2025') { year = 2025; monthsToLoad = [ops2025Month]; }
+        else if (activeTab === 'ops2026') { year = 2026; monthsToLoad = [ops2026Month]; }
+        else if (activeTab === 'overview') {
+            year = parseInt(selectedYear);
+            if (activeTab === 'overview' && selectedMonth === 'All') {
+                monthsToLoad = Array.from({ length: 12 }, (_, i) => i + 1);
+            } else if (activeTab === 'overview') {
+                monthsToLoad = [parseInt(selectedMonth)];
+            }
+        }
 
-        const loadMonthData = async () => {
+        if (year === 0 || monthsToLoad.length === 0 || isNaN(year)) return;
+
+        const loadData = async () => {
             setIsFetchingData(true);
             isHydrating.current = true;
             try {
-                const daysInMonth = new Date(year, month, 0).getDate();
-                const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+                // Determine all date strings to fetch
+                const datesToFetch: string[] = [];
+                monthsToLoad.forEach(m => {
+                    const daysInMonth = new Date(year, m, 0).getDate();
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        datesToFetch.push(`${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+                    }
+                });
 
                 // Parallel fetch
-                const results = await Promise.all(days.map(async (d) => {
-                    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const results = await Promise.all(datesToFetch.map(async (dateStr) => {
                     const key = `ops_granular_${dateStr}`;
                     const val = await getSystemConfig(key, '');
                     return { dateStr, val, key };
@@ -1388,8 +1403,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 setIsFetchingData(false);
             }
         };
-        loadMonthData();
-    }, [activeTab, ops2024Month, ops2025Month, ops2026Month]);
+        loadData();
+    }, [activeTab, ops2024Month, ops2025Month, ops2026Month, selectedYear, selectedMonth]);
 
     useEffect(() => {
         // Initial fetch of target configuration
