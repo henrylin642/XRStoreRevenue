@@ -2649,6 +2649,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 attractions={attractions}
                             />
 
+                            <DailyRevenueVisitorsChart
+                                title={`2024年 ${ops2024Month}月 每日營收及體驗人次圖`}
+                                data={ops2024Data}
+                            />
+
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
@@ -2778,6 +2783,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 month={ops2025Month}
                                 granularData={granularData}
                                 attractions={attractions}
+                            />
+
+                            <DailyRevenueVisitorsChart
+                                title={`2025年 ${ops2025Month}月 每日營收及體驗人次圖`}
+                                data={ops2025Data}
                             />
 
                             {/* Success/Failure Analysis Section */}
@@ -3018,6 +3028,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 month={ops2026Month}
                                 granularData={granularData}
                                 attractions={attractions}
+                            />
+
+                            <DailyRevenueVisitorsChart
+                                title={`2026年 ${ops2026Month}月 每日營收及體驗人次圖`}
+                                data={ops2026Data}
                             />
 
                             <div className="overflow-x-auto">
@@ -3806,6 +3821,61 @@ function AttractionRankingCard({
                         </div>
                     </div>
                 ))}
+            </div>
+        </div>
+    );
+}
+
+function DailyRevenueVisitorsChart({
+    data,
+    title = "每日營收及體驗人次圖"
+}: {
+    data: { day: number; revenue: number; visitorCount: number }[];
+    title?: string;
+}) {
+    const chartData = useMemo(() => {
+        return data.map((row) => ({
+            day: row.day,
+            revenue: row.revenue || 0,
+            visitors: row.visitorCount || 0
+        }));
+    }, [data]);
+
+    return (
+        <div className="mb-8 bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+            <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <BarChart2 className="w-5 h-5 text-blue-500" />
+                {title}
+            </h4>
+            <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} barGap={4} barCategoryGap="20%">
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                        <XAxis dataKey="day" minTickGap={12} />
+                        <YAxis
+                            yAxisId="left"
+                            tickFormatter={(val) => `$${(val / 1000).toLocaleString()}k`}
+                            label={{ value: '營收', angle: -90, position: 'insideLeft' }}
+                        />
+                        <YAxis
+                            yAxisId="right"
+                            orientation="right"
+                            allowDecimals={false}
+                            label={{ value: '體驗人次', angle: 90, position: 'insideRight' }}
+                        />
+                        <Tooltip
+                            formatter={(val: number | string, name: string) => {
+                                if (name === '當日營收') return [`$${Number(val).toLocaleString()}`, name];
+                                if (name === '體驗人次') return [`${Number(val).toLocaleString()} 人`, name];
+                                return [val, name];
+                            }}
+                            labelFormatter={(label) => `日期: ${label} 日`}
+                        />
+                        <Legend />
+                        <Bar yAxisId="left" dataKey="revenue" name="當日營收" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        <Bar yAxisId="right" dataKey="visitors" name="體驗人次" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                </ResponsiveContainer>
             </div>
         </div>
     );
