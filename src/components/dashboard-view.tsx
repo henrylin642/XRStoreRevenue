@@ -3864,10 +3864,11 @@ function DailyRevenueVisitorsChart({
                             label={{ value: '體驗人次', angle: 90, position: 'insideRight' }}
                         />
                         <Tooltip
-                            formatter={(val: number | string, name: string) => {
-                                if (name === '當日營收') return [`$${Number(val).toLocaleString()}`, name];
-                                if (name === '體驗人次') return [`${Number(val).toLocaleString()} 人`, name];
-                                return [val, name];
+                            formatter={(val, name) => {
+                                const numeric = typeof val === 'number' ? val : Number(val ?? 0);
+                                if (name === '當日營收') return [`$${numeric.toLocaleString()}`, name];
+                                if (name === '體驗人次') return [`${numeric.toLocaleString()} 人`, name];
+                                return [val ?? '-', name];
                             }}
                             labelFormatter={(label) => `日期: ${label} 日`}
                         />
