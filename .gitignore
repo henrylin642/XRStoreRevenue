@@ -33,6 +33,11 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# data files
+/public/data/*
+!/public/data/.gitkeep
+/copy_*.xlsx
+
 # vercel
 .vercel
 

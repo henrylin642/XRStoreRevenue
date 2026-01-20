@@ -1874,17 +1874,6 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     </button>
                 ))}
 
-                {/* Mobile/Ops friendly Logout Button in Tabs */}
-                <button
-                    onClick={async () => {
-                        const { logout } = await import('@/app/login/actions');
-                        await logout();
-                    }}
-                    className="py-3 px-6 font-medium text-sm flex items-center transition-colors text-slate-400 hover:text-red-500 hover:bg-red-50 ml-auto border-l border-slate-100"
-                >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    登出系統
-                </button>
             </div>
 
             {/* Overview Tab */}
