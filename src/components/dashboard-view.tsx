@@ -1342,9 +1342,29 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
     // Load Granular Data and Attractions
     useEffect(() => {
-        getSystemConfig('ops_attractions', JSON.stringify(['F1星軌飆速', '星際謎域', '星際射手', '蛋蛋大逃殺', '銀河追魂']))
+        getSystemConfig('ops_attractions', JSON.stringify(['F1星軌飆速', '星際謎域', '極光突襲', '星際射手', '蛋蛋大逃殺', '銀河追魂', '易動拳靶', '幽靈獵手AR槍']))
             .then(val => {
-                if (val) setAttractions(JSON.parse(val));
+                if (val) {
+                    let list = JSON.parse(val) as string[];
+                    // Auto-migration to fix order for "極光突襲"
+                    const targetOrder = ['F1星軌飆速', '星際謎域', '極光突襲', '星際射手', '蛋蛋大逃殺', '銀河追魂', '易動拳靶', '幽靈獵手AR槍'];
+
+                    // Check if we need to reorder
+                    const shouldReorder = targetOrder.every(item => list.includes(item)) &&
+                        (list.indexOf('極光突襲') > list.indexOf('星際射手')); // If it's after shooter (currently at end)
+
+                    if (shouldReorder) {
+                        const newList = [
+                            ...targetOrder,
+                            ...list.filter(item => !targetOrder.includes(item))
+                        ];
+                        if (JSON.stringify(newList) !== JSON.stringify(list)) {
+                            list = newList;
+                            updateSystemConfig('ops_attractions', JSON.stringify(list));
+                        }
+                    }
+                    setAttractions(list);
+                }
             });
     }, []);
 
