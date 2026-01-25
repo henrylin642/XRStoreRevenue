@@ -1952,6 +1952,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                 label={{ value: '營收', angle: -90, position: 'insideLeft' }}
                                                 domain={[0, (dataMax: number) => Math.max(dataMax, beValue * 1.2, chartTargetValue * 1.2)]}
                                             />
+                                            {granularity !== 'day' && (
+                                                <YAxis
+                                                    yAxisId="right"
+                                                    orientation="right"
+                                                    tickFormatter={(val) => `${val}`}
+                                                    label={{ value: '發票筆數', angle: 90, position: 'insideRight' }}
+                                                />
+                                            )}
                                             <Tooltip
                                                 formatter={(val: number | string | Array<number | string> | undefined, name: string | undefined) => {
                                                     if (name === 'count') return [`${val} 筆`, '交易筆數'];
@@ -1969,6 +1977,18 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             <ReferenceLine yAxisId="left" y={beValue} stroke="#ef4444" strokeDasharray="3 3">
                                                 <Label value="損益兩平線" position="insideTopLeft" fill="#ef4444" fontSize={10} offset={5} />
                                             </ReferenceLine>
+                                            {granularity !== 'day' && (
+                                                <Line
+                                                    yAxisId="right"
+                                                    type="monotone"
+                                                    dataKey="count"
+                                                    name="發票筆數"
+                                                    stroke="#f97316"
+                                                    strokeWidth={2}
+                                                    dot={{ r: 4 }}
+                                                    activeDot={{ r: 6 }}
+                                                />
+                                            )}
                                             <Line
                                                 yAxisId="left"
                                                 type="monotone"
