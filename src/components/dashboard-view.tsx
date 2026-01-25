@@ -1541,9 +1541,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         const daysInMonth = new Date(year, month, 0).getDate();
         const monthlyRecords = parsedData.filter(t => t.year === year && t.month === month && t.type === '交易成功');
         const dailyRevenue: Record<number, number> = {};
+        const dailyTxCount: Record<number, number> = {};
         monthlyRecords.forEach(t => {
             const day = t.day;
             dailyRevenue[day] = (dailyRevenue[day] || 0) + t.amount;
+            dailyTxCount[day] = (dailyTxCount[day] || 0) + 1;
         });
         const report = [];
         const weekDayMap = ['日', '一', '二', '三', '四', '五', '六'];
@@ -1556,6 +1558,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             const ticketRevenue = dailyRevenue[d] || 0;
             const privateEventRevenue = g.privateEventRevenue || 0;
             const totalRevenue = ticketRevenue + privateEventRevenue;
+            const txCount = dailyTxCount[d] || 0;
+            const atv = txCount > 0 ? ticketRevenue / txCount : 0;
 
             const attractionVisitors = Object.values(g.attractions || {}).reduce((sum: number, v: any) => sum + (Number(v) || 0), 0);
             const privateEventVisitors = g.privateEventVisitors || 0;
@@ -1574,7 +1578,9 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 attractionVisitors,
                 privateEventVisitors,
                 visitorCount: totalVisitors,
-                dailyARPU: totalVisitors > 0 ? totalRevenue / totalVisitors : 0
+                dailyARPU: totalVisitors > 0 ? totalRevenue / totalVisitors : 0,
+                txCount,
+                atv
             });
         }
         return report;
@@ -1586,9 +1592,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         const daysInMonth = new Date(year, month, 0).getDate();
         const monthlyRecords = parsedData.filter(t => t.year === year && t.month === month && t.type === '交易成功');
         const dailyRevenue: Record<number, number> = {};
+        const dailyTxCount: Record<number, number> = {};
         monthlyRecords.forEach(t => {
             const day = t.day;
             dailyRevenue[day] = (dailyRevenue[day] || 0) + t.amount;
+            dailyTxCount[day] = (dailyTxCount[day] || 0) + 1;
         });
         const report = [];
         const weekDayMap = ['日', '一', '二', '三', '四', '五', '六'];
@@ -1601,6 +1609,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             const ticketRevenue = dailyRevenue[d] || 0;
             const privateEventRevenue = g.privateEventRevenue || 0;
             const totalRevenue = ticketRevenue + privateEventRevenue;
+            const txCount = dailyTxCount[d] || 0;
+            const atv = txCount > 0 ? ticketRevenue / txCount : 0;
 
             const attractionVisitors = Object.values(g.attractions || {}).reduce((sum: number, v: any) => sum + (Number(v) || 0), 0);
             const privateEventVisitors = g.privateEventVisitors || 0;
@@ -1619,7 +1629,9 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 attractionVisitors,
                 privateEventVisitors,
                 visitorCount: totalVisitors,
-                dailyARPU: totalVisitors > 0 ? totalRevenue / totalVisitors : 0
+                dailyARPU: totalVisitors > 0 ? totalRevenue / totalVisitors : 0,
+                txCount,
+                atv
             });
         }
         return report;
@@ -1669,9 +1681,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
         // Aggregate daily revenue
         const dailyRevenue: Record<number, number> = {};
+        const dailyTxCount: Record<number, number> = {};
         monthlyRecords.forEach(t => {
             const day = t.day;
             dailyRevenue[day] = (dailyRevenue[day] || 0) + t.amount;
+            dailyTxCount[day] = (dailyTxCount[day] || 0) + 1;
         });
 
         // Generate full list
@@ -1687,6 +1701,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             const ticketRevenue = dailyRevenue[d] || 0;
             const privateEventRevenue = g.privateEventRevenue || 0;
             const totalRevenue = ticketRevenue + privateEventRevenue;
+            const txCount = dailyTxCount[d] || 0;
+            const atv = txCount > 0 ? ticketRevenue / txCount : 0;
 
             const attractionVisitors = Object.values(g.attractions || {}).reduce((sum: number, v: any) => sum + (Number(v) || 0), 0);
             const privateEventVisitors = g.privateEventVisitors || 0;
@@ -1705,7 +1721,9 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 attractionVisitors,
                 privateEventVisitors,
                 visitorCount: totalVisitors,
-                dailyARPU: totalVisitors > 0 ? totalRevenue / totalVisitors : 0
+                dailyARPU: totalVisitors > 0 ? totalRevenue / totalVisitors : 0,
+                txCount,
+                atv
             });
         }
 
@@ -2683,6 +2701,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             <th className="px-4 py-3 text-right">票務收入</th>
                                             <th className="px-4 py-3 text-right">包場收入</th>
                                             <th className="px-4 py-3 text-right">當日收入</th>
+                                            <th className="px-4 py-3 text-right text-slate-500">發票筆數</th>
+                                            <th className="px-4 py-3 text-right text-amber-600">平均交易價</th>
                                             <th className="px-4 py-3 text-right">體驗人次</th>
                                             <th className="px-4 py-3 text-right">包場人次</th>
                                             <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
@@ -2704,6 +2724,12 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
                                                     ${new Intl.NumberFormat('en-US').format(row.revenue)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-slate-500 font-mono">
+                                                    {row.txCount > 0 ? row.txCount : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-amber-600 font-mono">
+                                                    {row.atv > 0 ? `$${new Intl.NumberFormat('en-US').format(Math.round(row.atv))}` : '-'}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="flex items-center justify-end gap-2">
@@ -2853,6 +2879,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             <th className="px-4 py-3 text-right">票務收入</th>
                                             <th className="px-4 py-3 text-right">包場收入</th>
                                             <th className="px-4 py-3 text-right">當日收入</th>
+                                            <th className="px-4 py-3 text-right text-slate-500">發票筆數</th>
+                                            <th className="px-4 py-3 text-right text-amber-600">平均交易價</th>
                                             <th className="px-4 py-3 text-right">體驗人次</th>
                                             <th className="px-4 py-3 text-right">包場人次</th>
                                             <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
@@ -2874,6 +2902,12 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
                                                     ${new Intl.NumberFormat('en-US').format(row.revenue)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-slate-500 font-mono">
+                                                    {row.txCount > 0 ? row.txCount : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-amber-600 font-mono">
+                                                    {row.atv > 0 ? `$${new Intl.NumberFormat('en-US').format(Math.round(row.atv))}` : '-'}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="flex items-center justify-end gap-2">
@@ -3064,6 +3098,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             <th className="px-4 py-3 text-right">票務收入</th>
                                             <th className="px-4 py-3 text-right">包場收入</th>
                                             <th className="px-4 py-3 text-right">當日收入</th>
+                                            <th className="px-4 py-3 text-right text-slate-500">發票筆數</th>
+                                            <th className="px-4 py-3 text-right text-amber-600">平均交易價</th>
                                             <th className="px-4 py-3 text-right">體驗人次</th>
                                             <th className="px-4 py-3 text-right">包場人次</th>
                                             <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
@@ -3085,6 +3121,12 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
                                                     ${new Intl.NumberFormat('en-US').format(row.revenue)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-slate-500 font-mono">
+                                                    {row.txCount > 0 ? row.txCount : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-amber-600 font-mono">
+                                                    {row.atv > 0 ? `$${new Intl.NumberFormat('en-US').format(Math.round(row.atv))}` : '-'}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="flex items-center justify-end gap-2">
