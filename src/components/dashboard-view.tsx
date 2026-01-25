@@ -1949,20 +1949,25 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             <YAxis
                                                 yAxisId="left"
                                                 tickFormatter={(val) => `$${(val / 1000).toLocaleString()}k`}
-                                                label={{ value: '營收', angle: -90, position: 'insideLeft' }}
-                                                domain={[0, (dataMax: number) => Math.max(dataMax, beValue * 1.2, chartTargetValue * 1.2)]}
+                                                domain={[0, (dataMax: number) => {
+                                                    const max = Math.max(dataMax, beValue * 1.2, chartTargetValue * 1.2);
+                                                    // Round up to nearest nice number to avoid weird decimals
+                                                    if (max > 1000000) return Math.ceil(max / 100000) * 100000;
+                                                    if (max > 100000) return Math.ceil(max / 10000) * 10000;
+                                                    return Math.ceil(max / 1000) * 1000;
+                                                }]}
                                             />
                                             {granularity !== 'day' && (
                                                 <YAxis
                                                     yAxisId="right"
                                                     orientation="right"
-                                                    tickFormatter={(val) => `${val}`}
-                                                    label={{ value: '發票筆數', angle: 90, position: 'insideRight' }}
+                                                    tickFormatter={(val) => `$${val}`}
+                                                    label={{ value: '平均客單價 (ATV)', angle: 90, position: 'insideRight' }}
                                                 />
                                             )}
                                             <Tooltip
                                                 formatter={(val: number | string | Array<number | string> | undefined, name: string | undefined) => {
-                                                    if (name === 'count') return [`${val} 筆`, '交易筆數'];
+                                                    if (name === 'atv') return [`$${val}`, '平均客單價'];
                                                     if (name === 'revenue') return [`$${(val as number).toLocaleString()}`, '營收'];
                                                     return val;
                                                 }}
@@ -1981,8 +1986,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                 <Line
                                                     yAxisId="right"
                                                     type="monotone"
-                                                    dataKey="count"
-                                                    name="發票筆數"
+                                                    dataKey="atv"
+                                                    name="平均客單價"
                                                     stroke="#f97316"
                                                     strokeWidth={2}
                                                     dot={{ r: 4 }}
