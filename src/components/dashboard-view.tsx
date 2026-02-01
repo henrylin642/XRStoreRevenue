@@ -787,7 +787,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             url: 'https://www.newebpay.com/main/login_center/single_login?backurl=aHR0cHM6Ly93d3cubmV3ZWJwYXkuY29tL2luZGV4LnBocC9zYWxlL1NlbGxfY2VudGVyL3NlYXJjaF90cmFuc2FjdGlvbg==',
             loginType: '企業會員登入',
             companyId: '54987742',
-            adminAccount: 'lig54987742'
+            adminAccount: 'lig54987742',
+            path: '路徑：交易查詢 > 銷售記錄查詢 > 開始查詢 > 下載查詢結果'
         },
         {
             method: '掃碼-全支付',
