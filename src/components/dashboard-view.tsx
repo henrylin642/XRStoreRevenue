@@ -796,6 +796,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             loginType: '商店帳戶登入',
             adminAccount: 'lig54987742',
             note: '帳戶會將數據以 mail 的方式寄送'
+        },
+        {
+            method: '掃碼-街口支付',
+            name: '街口支付 JKO Pay',
+            url: 'https://www.jkos.com/Merchant.Web/MerchantLogin/Login',
+            loginType: '商店帳戶登入',
+            adminAccount: 'lig54987742',
+            note: '路徑：財務管理 > 交易記錄 > 報表下載'
         }
     ];
 
