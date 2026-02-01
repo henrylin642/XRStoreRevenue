@@ -421,11 +421,23 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     });
     const [invoicePaymentFilter, setInvoicePaymentFilter] = useState<string>('All');
+    const [invoiceTransactionTypeFilter, setInvoiceTransactionTypeFilter] = useState<string>('All');
+    const [invoiceIssueTypeFilter, setInvoiceIssueTypeFilter] = useState<string>('All');
 
     // Payment Method Options
     const paymentMethodOptions = useMemo(() => {
         const methods = new Set(parsedData.map(t => t.paymentMethod).filter(Boolean));
         return Array.from(methods).sort();
+    }, [parsedData]);
+
+    const transactionTypeOptions = useMemo(() => {
+        const types = new Set(parsedData.map(t => t.type).filter(Boolean));
+        return Array.from(types).sort();
+    }, [parsedData]);
+
+    const invoiceIssueTypeOptions = useMemo(() => {
+        const types = new Set(parsedData.map(t => t.invoiceStatus).filter(Boolean));
+        return Array.from(types).sort();
     }, [parsedData]);
 
     // Identify Refund Invoices (Invoice numbers that have at least one negative amount record)
@@ -439,7 +451,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         return set;
     }, [parsedData]);
 
-    // Data for Invoice List (Applied all filters + Only Valid Invoices)
+    // Data for Invoice List (Applied all filters)
     const invoiceTabData = useMemo(() => {
         let data = parsedData;
 
@@ -460,12 +472,19 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             });
         }
 
-        // Only show successful transactions for invoice audit
-        data = data.filter(t => t.type === '交易成功');
-
         // Payment Method Filter
         if (invoicePaymentFilter !== 'All') {
             data = data.filter(t => t.paymentMethod === invoicePaymentFilter);
+        }
+
+        // Invoice Issue Type Filter
+        if (invoiceIssueTypeFilter !== 'All') {
+            data = data.filter(t => t.invoiceStatus === invoiceIssueTypeFilter);
+        }
+
+        // Transaction Type Filter
+        if (invoiceTransactionTypeFilter !== 'All') {
+            data = data.filter(t => t.type === invoiceTransactionTypeFilter);
         }
 
         // Only show records with Invoice Number <--- REMOVED FILTER
@@ -473,7 +492,32 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
         // Sort by Date DESC (Newest First)
         return data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [parsedData, selectedYear, selectedMonth, invoiceStartDate, invoiceEndDate, invoicePaymentFilter]);
+    }, [parsedData, selectedYear, selectedMonth, invoiceStartDate, invoiceEndDate, invoicePaymentFilter, invoiceTransactionTypeFilter, invoiceIssueTypeFilter]);
+
+    const invoiceStatusSummary = useMemo(() => {
+        const map = new Map<string, { count: number, amount: number }>();
+        invoiceTabData.forEach(t => {
+            const key = t.type || '未知';
+            const entry = map.get(key) || { count: 0, amount: 0 };
+            entry.count += 1;
+            entry.amount += Number(t.amount) || 0;
+            map.set(key, entry);
+        });
+
+        const rows = Array.from(map.entries()).map(([status, data]) => ({
+            status,
+            count: data.count,
+            amount: data.amount
+        }));
+
+        const total = rows.reduce((acc, row) => {
+            acc.count += row.count;
+            acc.amount += row.amount;
+            return acc;
+        }, { count: 0, amount: 0 });
+
+        return { rows, total };
+    }, [invoiceTabData]);
 
     // Data for Anomaly Detection (Applied Date filter ONLY, ignore Payment filter)
     const invoiceAnomalyData = useMemo(() => {
@@ -2594,6 +2638,34 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                             {/* Filters Toolbar */}
                             <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-slate-50 rounded-lg">
                                 <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => {
+                                            const now = new Date();
+                                            const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                                            const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                            setInvoiceStartDate(formatDate(firstDayThisMonth));
+                                            setInvoiceEndDate(formatDate(now));
+                                        }}
+                                        className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors"
+                                    >
+                                        本月
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const now = new Date();
+                                            const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                                            const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+                                            const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                            setInvoiceStartDate(formatDate(firstDayLastMonth));
+                                            setInvoiceEndDate(formatDate(lastDayLastMonth));
+                                        }}
+                                        className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors"
+                                    >
+                                        上個月
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center gap-2">
                                     <span className="text-xs font-semibold text-slate-500 uppercase">日期範圍</span>
                                     <input
                                         type="date"
@@ -2611,38 +2683,119 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 </div>
 
                                 {invoiceSubTab === 'list' && (
-                                    <div className="flex items-center gap-2 ml-auto md:ml-0">
-                                        <span className="text-xs font-semibold text-slate-500 uppercase">支付方式</span>
-                                        <select
-                                            value={invoicePaymentFilter}
-                                            onChange={(e) => setInvoicePaymentFilter(e.target.value)}
-                                            className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500 min-w-[120px]"
-                                        >
-                                            <option value="All">全部</option>
-                                            {paymentMethodOptions.map(p => (
-                                                <option key={p} value={p}>{p}</option>
-                                            ))}
-                                        </select>
+                                    <div className="flex flex-wrap items-center gap-3 ml-auto md:ml-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-500 uppercase">支付方式</span>
+                                            <select
+                                                value={invoicePaymentFilter}
+                                                onChange={(e) => setInvoicePaymentFilter(e.target.value)}
+                                                className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500 min-w-[120px]"
+                                            >
+                                                <option value="All">全部</option>
+                                                {paymentMethodOptions.map(p => (
+                                                    <option key={p} value={p}>{p}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-500 uppercase">交易類型</span>
+                                            <select
+                                                value={invoiceTransactionTypeFilter}
+                                                onChange={(e) => setInvoiceTransactionTypeFilter(e.target.value)}
+                                                className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500 min-w-[120px]"
+                                            >
+                                                <option value="All">全部</option>
+                                                {transactionTypeOptions.map(t => (
+                                                    <option key={t} value={t}>{t}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-500 uppercase">發票開立類型</span>
+                                            <select
+                                                value={invoiceIssueTypeFilter}
+                                                onChange={(e) => setInvoiceIssueTypeFilter(e.target.value)}
+                                                className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500 min-w-[140px]"
+                                            >
+                                                <option value="All">全部</option>
+                                                {invoiceIssueTypeOptions.map(t => (
+                                                    <option key={t} value={t}>{t}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     </div>
                                 )}
 
-                                {(invoiceStartDate || invoiceEndDate || invoicePaymentFilter !== 'All') && (
-                                    <button
-                                        onClick={() => {
-                                            setInvoiceStartDate('');
-                                            setInvoiceEndDate('');
-                                            setInvoicePaymentFilter('All');
-                                        }}
-                                        className="ml-auto text-xs text-blue-600 hover:text-blue-800 underline px-2"
-                                    >
-                                        清除篩選
-                                    </button>
-                                )}
+                                {(() => {
+                                    const now = new Date();
+                                    const defaultStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+                                    const defaultEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                                    const isDirty = invoiceStartDate !== defaultStart || invoiceEndDate !== defaultEnd ||
+                                        invoicePaymentFilter !== 'All' || invoiceTransactionTypeFilter !== 'All' || invoiceIssueTypeFilter !== 'All';
+                                    if (!isDirty) return null;
+                                    return (
+                                        <button
+                                            onClick={() => {
+                                                const resetNow = new Date();
+                                                const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                                const firstDay = new Date(resetNow.getFullYear(), resetNow.getMonth(), 1);
+                                                setInvoiceStartDate(formatDate(firstDay));
+                                                setInvoiceEndDate(formatDate(resetNow));
+                                                setInvoicePaymentFilter('All');
+                                                setInvoiceTransactionTypeFilter('All');
+                                                setInvoiceIssueTypeFilter('All');
+                                            }}
+                                            className="ml-auto text-xs text-blue-600 hover:text-blue-800 underline px-2"
+                                        >
+                                            清除篩選
+                                        </button>
+                                    );
+                                })()}
                             </div>
 
                             {/* Content Area */}
                             {invoiceSubTab === 'list' ? (
                                 <div className="space-y-4">
+                                    <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
+                                                <tr>
+                                                    <th className="px-4 py-3">交易狀態</th>
+                                                    <th className="px-4 py-3 text-right">筆數</th>
+                                                    <th className="px-4 py-3 text-right">估算金額</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {invoiceStatusSummary.rows.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={3} className="px-4 py-6 text-center text-slate-500">沒有符合條件的交易</td>
+                                                    </tr>
+                                                ) : (
+                                                    <>
+                                                        {invoiceStatusSummary.rows.map(row => (
+                                                            <tr key={row.status} className="hover:bg-slate-50">
+                                                                <td className="px-4 py-3 text-slate-700">{row.status}</td>
+                                                                <td className="px-4 py-3 text-right font-mono text-slate-700">{row.count.toLocaleString()}</td>
+                                                                <td className="px-4 py-3 text-right font-mono text-slate-700">
+                                                                    ${Math.round(row.amount).toLocaleString()}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                        <tr className="bg-slate-50 font-bold">
+                                                            <td className="px-4 py-3 text-slate-800">總計</td>
+                                                            <td className="px-4 py-3 text-right font-mono text-slate-800">{invoiceStatusSummary.total.count.toLocaleString()}</td>
+                                                            <td className="px-4 py-3 text-right font-mono text-slate-800">
+                                                                ${Math.round(invoiceStatusSummary.total.amount).toLocaleString()}
+                                                            </td>
+                                                        </tr>
+                                                    </>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
                                     <div className="text-right text-xs text-slate-500">
                                         共 {invoiceTabData.length} 筆資料
                                     </div>
