@@ -2546,14 +2546,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                 )}
                             </div>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left">
+                                <table className="w-full text-xs text-left min-w-[1400px]">
                                     <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                                         <tr>
-                                            <th className="px-4 py-3 w-20">月份</th>
+                                            <th className="px-4 py-3 w-20 whitespace-nowrap">月份</th>
                                             {reconPlatforms.map((p) => (
                                                 <th key={p} className="px-4 py-3 text-center whitespace-nowrap">{p}</th>
                                             ))}
-                                            <th className="px-4 py-3 w-56">備註說明</th>
+                                            <th className="px-4 py-3 w-56 whitespace-nowrap">備註說明</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -2567,11 +2567,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
                                             return (
                                                 <tr key={monthStr} className="hover:bg-slate-50/50">
-                                                    <td className="px-4 py-3 font-medium text-slate-700">{getReconMonthLabel(idx)}</td>
+                                                    <td className="px-4 py-3 font-medium text-slate-700 whitespace-nowrap">{getReconMonthLabel(idx)}</td>
                                                     {reconPlatforms.map((method) => {
                                                         const record = reconMonthlyLatest.get(`${monthStr}__${method}`);
                                                         return (
-                                                            <td key={method} className="px-4 py-3 text-center">
+                                                            <td key={method} className="px-4 py-3 text-center whitespace-nowrap">
                                                                 {record ? (
                                                                     <button
                                                                         onClick={() => handleOpenReconRecord(record.id)}
@@ -2585,7 +2585,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                             </td>
                                                         );
                                                     })}
-                                                    <td className="px-4 py-3 text-xs text-slate-500">
+                                                    <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
                                                         {monthLatest ? `${monthLatest.method} (${monthLatest.rangeStart} ~ ${monthLatest.rangeEnd})` : '尚未對賬'}
                                                     </td>
                                                 </tr>
