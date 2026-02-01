@@ -845,6 +845,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             adminAccountLabel: '請輸入您的登入帳號',
             adminAccount: 'AD016F18A',
             note: '路徑：帳號及資料管理 > 商店交易明細 > 匯出 Excel'
+        },
+        {
+            method: '掃碼-iPass MONEY',
+            name: 'iPASS MONEY',
+            url: 'https://ec.ipasspay.com.tw/merchant/user/login',
+            loginType: '公司戶以商店ID登入',
+            adminAccount: '1sha_54987742.PS',
+            note: '路徑：交易記錄查詢 > 交易記錄 > 下載 CSV'
         }
     ];
 
