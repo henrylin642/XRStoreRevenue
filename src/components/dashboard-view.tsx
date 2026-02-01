@@ -820,6 +820,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             name: '悠遊付 EasyCard',
             url: 'https://epmem.easycard.com.tw/',
             loginType: '商店帳戶登入',
+            hideLoginType: true,
             adminAccount: 'eddieyang0958',
             note: '路徑：訂單及退款 > 訂單管理 > 搜尋 > 匯出 Excel'
         }
@@ -2457,7 +2458,9 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             </a>
                                         </div>
                                         <div className="grid grid-cols-1 gap-2 text-xs text-slate-500">
-                                            <div>登入方式：<span className="text-slate-700 font-semibold">{portal.loginType}</span></div>
+                                            {portal.loginType && !portal.hideLoginType && (
+                                                <div>登入方式：<span className="text-slate-700 font-semibold">{portal.loginType}</span></div>
+                                            )}
                                             {portal.companyId && (
                                                 <div>公司統一編號：<span className="text-slate-700 font-semibold">{portal.companyId}</span></div>
                                             )}
