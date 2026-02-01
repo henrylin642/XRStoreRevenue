@@ -788,6 +788,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             loginType: '企業會員登入',
             companyId: '54987742',
             adminAccount: 'lig54987742'
+        },
+        {
+            method: '掃碼-全支付',
+            name: 'PxPayPlus',
+            url: 'https://merchant.pxpayplus.com/merchant_system_admin/login',
+            loginType: '商店帳戶登入',
+            adminAccount: 'lig54987742',
+            note: '帳戶會將數據以 mail 的方式寄送'
         }
     ];
 
@@ -2397,8 +2405,13 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                         </div>
                                         <div className="grid grid-cols-1 gap-2 text-xs text-slate-500">
                                             <div>登入方式：<span className="text-slate-700 font-semibold">{portal.loginType}</span></div>
-                                            <div>公司統一編號：<span className="text-slate-700 font-semibold">{portal.companyId}</span></div>
+                                            {portal.companyId && (
+                                                <div>公司統一編號：<span className="text-slate-700 font-semibold">{portal.companyId}</span></div>
+                                            )}
                                             <div>管理者帳號：<span className="text-slate-700 font-semibold">{portal.adminAccount}</span></div>
+                                            {portal.note && (
+                                                <div className="text-slate-400">{portal.note}</div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
