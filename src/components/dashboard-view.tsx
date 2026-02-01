@@ -2038,12 +2038,12 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 {[
                     { id: 'overview', label: '營運總覽', icon: <TrendingUp className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
                     { id: 'growth', label: '營收趨勢', icon: <TrendingUp className="w-4 h-4 mr-2" />, roles: ['admin'] },
-                    { id: 'invoice', label: '發票稽核', icon: <AlertTriangle className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
                     { id: 'ops2024', label: '2024年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
                     { id: 'ops2025', label: '2025年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
                     { id: 'ops2026', label: '2026年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
-                    { id: 'visitor_stats', label: '訪客統計', icon: <Users className="w-4 h-4 mr-2" />, roles: ['admin'] },
+                    { id: 'invoice', label: '發票稽核', icon: <AlertTriangle className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
                     { id: 'reconciliation', label: '對帳中心', icon: <DollarSign className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
+                    { id: 'visitor_stats', label: '訪客統計', icon: <Users className="w-4 h-4 mr-2" />, roles: ['admin'] },
                     { id: 'marketing', label: '行銷中心', icon: <Megaphone className="w-4 h-4 mr-2" />, roles: ['admin', 'ops'] },
                 ].filter(tab => tab.roles.includes(role)).map((tab) => (
                     <button
