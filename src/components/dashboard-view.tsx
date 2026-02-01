@@ -795,7 +795,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             url: 'https://merchant.pxpayplus.com/merchant_system_admin/login',
             loginType: '商店帳戶登入',
             adminAccount: 'lig54987742',
-            note: '帳戶會將數據以 mail 的方式寄送'
+            note: '帳戶會將數據以 mail 的方式寄送',
+            path: '路徑：賬務管理 > 訂單管理 > 下載報表'
         },
         {
             method: '掃碼-街口支付',
@@ -2419,6 +2420,9 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             <div>管理者帳號：<span className="text-slate-700 font-semibold">{portal.adminAccount}</span></div>
                                             {portal.note && (
                                                 <div className="text-slate-400">{portal.note}</div>
+                                            )}
+                                            {portal.path && (
+                                                <div className="text-slate-400">{portal.path}</div>
                                             )}
                                         </div>
                                     </div>
