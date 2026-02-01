@@ -858,6 +858,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         setPlatformData(data);
     };
 
+    const isRefundLikeStatus = (status: string) => {
+        const s = String(status || '').trim();
+        return /取消|退款|退刷|作廢/.test(s);
+    };
+
     const handleCompleteReconciliation = async () => {
         if (!reconciliationMatches.length) {
             alert('目前沒有可記錄的對賬資料');
@@ -1284,8 +1289,10 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     if (rule.mapRow) {
                         const mapped = rule.mapRow(cleanRow, rule);
                         if (mapped) {
+                            const refundLike = isRefundLikeStatus(mapped.status);
                             return {
                                 ...mapped,
+                                refundLike,
                                 raw: cleanRow,
                                 ruleUsed: rule
                             };
@@ -1303,6 +1310,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     const amount = Number(findVal(rule.amountFields) || 0);
                     const txId = String(findVal(rule.idFields) || '-');
                     const status = String(findVal(rule.statusFields) || '已付款').trim();
+                    const refundLike = isRefundLikeStatus(status);
 
                     let dateStr = '';
                     if (rawDate) {
@@ -1346,13 +1354,15 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                         amount,
                         txId,
                         status,
+                        refundLike,
                         raw: cleanRow,
                         ruleUsed: rule
                     };
                 }).filter((r: any) => {
                     if (r.date === '' || isNaN(r.amount)) return false;
                     const rule = RECON_RULES[reconPaymentMethod] || RECON_RULES['一般信用卡'];
-                    if (r.status && !rule.successStatuses.some((s: string) => r.status.includes(s))) return false;
+                    const isSuccess = r.status && rule.successStatuses.some((s: string) => r.status.includes(s));
+                    if (!isSuccess && !r.refundLike) return false;
                     if (r.amount === 0) return false;
                     return true;
                 });
@@ -1389,7 +1399,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 if (cancelled) return;
                 if (reconDataVersionRef.current !== loadVersion) return;
                 const { data } = parseReconStorageValue(raw);
-                applyReconPlatformData(Array.isArray(data) ? data : [], false);
+                const normalized = Array.isArray(data) ? data.map((item: any) => ({
+                    ...item,
+                    refundLike: typeof item.refundLike === 'boolean' ? item.refundLike : isRefundLikeStatus(item.status)
+                })) : [];
+                applyReconPlatformData(normalized, false);
             } catch (err) {
                 console.error('Failed to load platform data:', err);
                 if (!cancelled && reconDataVersionRef.current === loadVersion) {
@@ -1467,6 +1481,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
             filteredPlatformData.forEach((plat, pIdx) => {
                 if (matchedPlatformIndices.has(pIdx)) return;
+                if (sysWithMeta.isSalesReturn && !plat.refundLike) return;
+                if (!sysWithMeta.isSalesReturn && plat.refundLike) return;
                 if (Math.abs(plat.amount - sys.amount) > 0.1) return; // Amount mismatch
 
                 const platTime = new Date(plat.date).getTime();
