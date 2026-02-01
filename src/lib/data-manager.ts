@@ -74,7 +74,7 @@ export async function getTransactionsFromCSV(): Promise<Transaction[]> {
         paymentMethod: t.payment_method,
         type: t.transaction_type || '交易成功',
         paymentStatus: t.payment_status || '付款成功',
-        invoiceStatus: '已開立',
+        invoiceStatus: t.invoice_status || '',
         storeName: 'Unknown',
         sourceFile: 'database',
         remark: t.remark || '',
@@ -203,7 +203,7 @@ export async function mergeExcelData(fileBuffer: Buffer) {
         const transactionType = row['交易類型'] || '交易成功';
         const paymentStatus = row['支付交易類型'] || '付款成功';
         // Note: invoiceStatus is not always available, defaulting to '已開立'
-        const invoiceStatus = row['發票狀態'] || '已開立';
+        const invoiceStatus = row['發票開立類型'] || row['發票狀態'] || '';
         const storeName = row['店鋪名稱'] || 'Unknown';
 
         // Basic validation

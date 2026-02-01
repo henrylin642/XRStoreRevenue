@@ -48,6 +48,15 @@ const formatDateInTaipei = (dateStr: string, includeTime = true) => {
     }
 };
 
+const normalizeInvoiceIssueType = (val?: string) => {
+    const raw = (val || '').trim();
+    if (!raw) return '';
+    if (raw.includes('紙本')) return '紙本發票';
+    if (raw.includes('載具')) return '存入條碼載具';
+    if (raw === '已開立') return '';
+    return raw;
+};
+
 export default function DashboardView({ transactions, session }: DashboardViewProps) {
     const router = useRouter();
     const role = session?.role || 'admin';
@@ -436,8 +445,12 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     }, [parsedData]);
 
     const invoiceIssueTypeOptions = useMemo(() => {
-        const types = new Set(parsedData.map(t => t.invoiceStatus).filter(Boolean));
-        return Array.from(types).sort();
+        const types = new Set<string>();
+        parsedData.forEach(t => {
+            const normalized = normalizeInvoiceIssueType(t.invoiceStatus);
+            types.add(normalized);
+        });
+        return Array.from(types).filter(t => t !== '').sort();
     }, [parsedData]);
 
     // Identify Refund Invoices (Invoice numbers that have at least one negative amount record)
@@ -479,7 +492,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
         // Invoice Issue Type Filter
         if (invoiceIssueTypeFilter !== 'All') {
-            data = data.filter(t => t.invoiceStatus === invoiceIssueTypeFilter);
+            data = data.filter(t => {
+                const normalized = normalizeInvoiceIssueType(t.invoiceStatus);
+                if (invoiceIssueTypeFilter === '__EMPTY__') return normalized === '';
+                return normalized === invoiceIssueTypeFilter;
+            });
         }
 
         // Transaction Type Filter
@@ -2720,6 +2737,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                 className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500 min-w-[140px]"
                                             >
                                                 <option value="All">全部</option>
+                                                <option value="__EMPTY__">空白</option>
                                                 {invoiceIssueTypeOptions.map(t => (
                                                     <option key={t} value={t}>{t}</option>
                                                 ))}
@@ -2805,6 +2823,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                 <tr>
                                                     <th className="px-4 py-3">訂單編號</th>
                                                     <th className="px-4 py-3">發票號碼</th>
+                                                    <th className="px-4 py-3">發票開立類型</th>
                                                     <th className="px-4 py-3">交易時間</th>
                                                     <th className="px-4 py-3 text-right">發票金額</th>
                                                     <th className="px-4 py-3">支付方式</th>
@@ -2814,7 +2833,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             <tbody className="divide-y divide-slate-100">
                                                 {invoiceTabData.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan={6} className="p-8 text-center text-slate-500">沒有符合條件的發票資料</td>
+                                                        <td colSpan={7} className="p-8 text-center text-slate-500">沒有符合條件的發票資料</td>
                                                     </tr>
                                                 ) : (
                                                     <InvoiceTablePagination data={invoiceTabData} refundSet={refundSet} />
@@ -3945,6 +3964,7 @@ function InvoiceTablePagination({ data, refundSet }: { data: any[], refundSet: S
                 const invoiceStyle = hasInvoice
                     ? 'font-mono text-slate-700 font-medium group-hover:text-blue-600'
                     : 'text-red-500 font-bold';
+                const issueType = normalizeInvoiceIssueType(t.invoiceStatus);
 
                 let remark = '';
                 if (!hasInvoice) remark = '無發票記錄';
@@ -3957,6 +3977,9 @@ function InvoiceTablePagination({ data, refundSet }: { data: any[], refundSet: S
                         </td>
                         <td className={`px-4 py-3 ${invoiceStyle} transition-colors`}>
                             {hasInvoice ? t.invoiceNumber : '無發票記錄'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                            {issueType || '空白'}
                         </td>
                         <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
                             {formatDateInTaipei(t.date)}
@@ -3975,7 +3998,7 @@ function InvoiceTablePagination({ data, refundSet }: { data: any[], refundSet: S
             })}
             {totalPages > 1 && (
                 <tr>
-                    <td colSpan={6} className="p-4 border-t border-slate-100 bg-slate-50">
+                    <td colSpan={7} className="p-4 border-t border-slate-100 bg-slate-50">
                         <div className="flex justify-between items-center">
                             <span className="text-xs text-slate-500">
                                 顯示 {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, data.length)} 筆，共 {data.length} 筆

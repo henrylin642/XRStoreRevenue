@@ -11,7 +11,7 @@ export interface Transaction {
   type: string; // 交易類型 (一般銷售, 退貨 etc)
   paymentStatus: string; // 支付交易類型 (付款成功)
   paymentMethod: string; // 支付方式
-  invoiceStatus: string; // 發票狀態
+  invoiceStatus: string; // 發票開立類型
   invoiceNumber: string; // 發票號碼
   sourceFile: string; // 來源檔案 (便於追蹤月份)
 }
@@ -73,7 +73,7 @@ export async function getAllTransactions(): Promise<Transaction[]> {
         type: getVal('交易類型') || '',
         paymentStatus: getVal('支付交易類型') || '',
         paymentMethod: getVal('支付方式') || '',
-        invoiceStatus: getVal('發票狀態') || '',
+        invoiceStatus: getVal('發票開立類型') || getVal('發票狀態') || '',
         invoiceNumber: getVal('發票號碼')?.toString() || '',
         sourceFile: file
       };
