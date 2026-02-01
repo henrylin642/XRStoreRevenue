@@ -1463,6 +1463,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     }, [activeTab, reconPaymentMethod, RECON_YEAR]);
 
     const reconSystemRecords = useMemo(() => {
+        const refundLikePattern = /退款|取消|退刷|作廢/;
         return parsedData.filter(t => {
             if (t.year !== RECON_YEAR) return false;
             // Case-insensitive payment method matching
@@ -1470,7 +1471,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             const targetMethod = reconPaymentMethod.toLowerCase();
             if (sysMethod !== targetMethod && t.paymentMethod !== reconPaymentMethod) return false;
 
-            if (t.type !== '交易成功') return false;
+            const isRefundLike = t.amount < 0 ||
+                refundLikePattern.test(String(t.type || '')) ||
+                refundLikePattern.test(String(t.paymentStatus || ''));
+
+            if (!isRefundLike && t.type !== '交易成功') return false;
 
             // Format date to YYYY-MM-DD for comparison
             const dateStr = `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
@@ -1507,20 +1512,42 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             const sysTime = new Date(sys.date).getTime();
             let bestMatchIdx = -1;
             let minDiff = 60 * 1000; // 60 seconds tolerance
+            const sysRefundLike = sys.amount < 0 || /退款|取消|退刷|作廢/.test(String(sys.type || sys.paymentStatus || ''));
 
-            filteredPlatformData.forEach((plat, pIdx) => {
-                if (matchedPlatformIndices.has(pIdx)) return;
-                if (sysWithMeta.isSalesReturn && !plat.refundLike) return;
-                if (!sysWithMeta.isSalesReturn && plat.refundLike) return;
-                if (Math.abs(plat.amount - sys.amount) > 0.1) return; // Amount mismatch
+            const findBestMatch = (refundPreference: boolean | null) => {
+                let candidateIdx = -1;
+                let candidateDiff = 60 * 1000;
+                filteredPlatformData.forEach((plat, pIdx) => {
+                    if (matchedPlatformIndices.has(pIdx)) return;
+                    const platRefundLike = !!plat.refundLike || Number(plat.amount) < 0;
+                    if (refundPreference !== null && platRefundLike !== refundPreference) return;
 
-                const platTime = new Date(plat.date).getTime();
-                const diff = Math.abs(platTime - sysTime);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    bestMatchIdx = pIdx;
+                    const amountDiff = (platRefundLike || sysRefundLike)
+                        ? Math.abs(Math.abs(plat.amount) - Math.abs(sys.amount))
+                        : Math.abs(plat.amount - sys.amount);
+                    if (amountDiff > 0.1) return;
+
+                    const platTime = new Date(plat.date).getTime();
+                    const diff = Math.abs(platTime - sysTime);
+                    if (diff < candidateDiff) {
+                        candidateDiff = diff;
+                        candidateIdx = pIdx;
+                    }
+                });
+                return { idx: candidateIdx, diff: candidateDiff };
+            };
+
+            const preferred = findBestMatch(sysRefundLike);
+            if (preferred.idx !== -1) {
+                bestMatchIdx = preferred.idx;
+                minDiff = preferred.diff;
+            } else {
+                const fallback = findBestMatch(null);
+                if (fallback.idx !== -1) {
+                    bestMatchIdx = fallback.idx;
+                    minDiff = fallback.diff;
                 }
-            });
+            }
 
             if (bestMatchIdx !== -1) {
                 matchedPlatformIndices.add(bestMatchIdx);
