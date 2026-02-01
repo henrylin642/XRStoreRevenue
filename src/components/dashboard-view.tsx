@@ -52,7 +52,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     const router = useRouter();
     const role = session?.role || 'admin';
     const [isPending, startTransition] = useTransition();
-    const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2024' | 'ops2025' | 'ops2026' | 'visitor_stats' | 'reconciliation' | 'ledger' | 'marketing'>(
+    const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2024' | 'ops2025' | 'ops2026' | 'visitor_stats' | 'reconciliation' | 'marketing'>(
         role === 'ops' ? 'ops2026' : 'overview'
     );
     const [selectedYear, setSelectedYear] = useState<string>('2026');
@@ -702,17 +702,6 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     const [isReconLoading, setIsReconLoading] = useState(false);
     const reconDataVersionRef = React.useRef(0);
 
-    // Ledger (流水賬) State
-    const [ledgerData, setLedgerData] = useState<any[]>([]);
-    const [ledgerStartDate, setLedgerStartDate] = useState<string>(() => {
-        const now = new Date();
-        const first = new Date(now.getFullYear(), now.getMonth(), 1);
-        return `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}-${String(first.getDate()).padStart(2, '0')}`;
-    });
-    const [ledgerEndDate, setLedgerEndDate] = useState<string>(() => {
-        const now = new Date();
-        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    });
 
     const toBase64Url = (input: string) => {
         const utf8 = encodeURIComponent(input).replace(/%([0-9A-F]{2})/g, (_, p1) =>
@@ -1220,152 +1209,6 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         };
         reader.readAsArrayBuffer(file);
     };
-
-    const LEDGER_FIELDS = {
-        date: ['交易時間', '交易日期', '日期', 'Date', '時間'],
-        orderId: ['訂單編號', '訂單號碼', 'Order ID', 'Order No', '訂單號'],
-        orderAmount: ['訂單金額', '交易金額', '金額', 'Amount'],
-        invoiceAmount: ['發票金額', '發票總額', '開立金額', 'Invoice Amount'],
-        status: ['交易狀態', '訂單狀態', '付款狀態', 'Status']
-    };
-
-    const parseLedgerDate = (raw: any) => {
-        if (!raw) return '';
-        if (raw instanceof Date) return raw.toISOString();
-        if (typeof raw === 'number') {
-            try {
-                const date = XLSX.SSF.parse_date_code(raw);
-                const ds = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')} ${String(date.H).padStart(2, '0')}:${String(date.M).padStart(2, '0')}:${String(date.S).padStart(2, '0')}`;
-                const d = new Date(ds + ' +08:00');
-                if (!isNaN(d.getTime())) return d.toISOString();
-            } catch (e) {
-                const d = new Date(Math.round((raw - 25569) * 864e5));
-                if (!isNaN(d.getTime())) return d.toISOString();
-            }
-        }
-        const clean = String(raw).trim().replace(/\//g, '-');
-        if (!clean) return '';
-        const hasTime = clean.includes(':');
-        const toParse = hasTime ? clean : `${clean} 00:00:00`;
-        const d = new Date(toParse.replace(/\s*[+-]\d{2}(:?\d{2})?$/, '').replace(/Z$/, '') + ' +08:00');
-        return isNaN(d.getTime()) ? '' : d.toISOString();
-    };
-
-    const handleLedgerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files?.[0]) return;
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const dataRaw = event.target?.result;
-                let wb;
-
-                if (file.name.toLowerCase().endsWith('.csv') && dataRaw instanceof ArrayBuffer) {
-                    const decoder = new TextDecoder('utf-8');
-                    const csvContent = decoder.decode(dataRaw);
-                    wb = XLSX.read(csvContent, { type: 'string', cellDates: true });
-                } else {
-                    wb = XLSX.read(dataRaw, { type: 'array', cellDates: true });
-                }
-
-                const wsname = wb.SheetNames[0];
-                const ws = wb.Sheets[wsname];
-
-                const allPossibleHeaders = [
-                    ...LEDGER_FIELDS.date,
-                    ...LEDGER_FIELDS.orderId,
-                    ...LEDGER_FIELDS.orderAmount,
-                    ...LEDGER_FIELDS.invoiceAmount,
-                    ...LEDGER_FIELDS.status
-                ];
-
-                const fullData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-                let headerIndex = 0;
-                for (let i = 0; i < Math.min(fullData.length, 20); i++) {
-                    const row: any = fullData[i];
-                    if (Array.isArray(row) && row.some(cell => typeof cell === 'string' && allPossibleHeaders.some(h => String(cell).includes(h)))) {
-                        headerIndex = i;
-                        break;
-                    }
-                }
-
-                const data = XLSX.utils.sheet_to_json(ws, { raw: true, range: headerIndex });
-
-                if (!data || data.length === 0) {
-                    alert('讀取失敗：檔案內容為空或無法解析');
-                    return;
-                }
-
-                const parsed = data.map((row: any) => {
-                    const cleanRow: any = {};
-                    Object.entries(row).forEach(([k, v]) => {
-                        const cleanKey = k.replace(/[^\x20-\x7E\s\u4E00-\u9FFF]/g, '').replace(/^"|"$/g, '').trim();
-                        let val: any = v;
-                        if (typeof v === 'string') {
-                            let strVal = v;
-                            if (strVal.startsWith('="') && strVal.endsWith('"')) {
-                                strVal = strVal.substring(2, strVal.length - 1);
-                            } else if (strVal.startsWith('"') && strVal.endsWith('"')) {
-                                strVal = strVal.substring(1, strVal.length - 1);
-                            }
-                            val = strVal.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
-                        } else if (typeof v === 'number' && v > 10000 && Number.isInteger(v)) {
-                            val = v.toFixed(0);
-                        }
-                        cleanRow[cleanKey] = val;
-                    });
-
-                    const findVal = (fields: string[]) => {
-                        for (const f of fields) if (cleanRow[f] !== undefined) return cleanRow[f];
-                        return null;
-                    };
-
-                    const rawDate = findVal(LEDGER_FIELDS.date);
-                    const rawOrderId = findVal(LEDGER_FIELDS.orderId);
-                    const rawOrderAmount = findVal(LEDGER_FIELDS.orderAmount);
-                    const rawInvoiceAmount = findVal(LEDGER_FIELDS.invoiceAmount);
-                    const rawStatus = findVal(LEDGER_FIELDS.status);
-
-                    const dateStr = parseLedgerDate(rawDate);
-                    const orderId = rawOrderId !== null && rawOrderId !== undefined ? String(rawOrderId) : '-';
-                    const toNumberOrNull = (val: any) => {
-                        if (val === null || val === undefined || val === '') return null;
-                        const num = Number(val);
-                        return isNaN(num) ? null : num;
-                    };
-                    const orderAmount = toNumberOrNull(rawOrderAmount);
-                    const invoiceAmount = toNumberOrNull(rawInvoiceAmount);
-                    const status = rawStatus !== null && rawStatus !== undefined ? String(rawStatus) : '-';
-
-                    return {
-                        date: dateStr,
-                        orderId,
-                        orderAmount,
-                        invoiceAmount,
-                        status,
-                        raw: cleanRow
-                    };
-                }).filter((r: any) => r.date !== '' || r.orderId !== '-' || r.orderAmount !== null || r.invoiceAmount !== null || r.status !== '-');
-
-                setLedgerData(parsed);
-            } catch (err) {
-                console.error('Ledger upload error:', err);
-                alert('上傳失敗：檔案格式錯誤或系統無法辨識此 CSV/Excel 內容');
-            }
-        };
-        reader.readAsArrayBuffer(file);
-    };
-
-    const ledgerFilteredData = useMemo(() => {
-        if (!ledgerData.length) return [];
-        return ledgerData.filter(item => {
-            if (!item.date) return false;
-            const dateStr = item.date.split('T')[0];
-            if (ledgerStartDate && dateStr < ledgerStartDate) return false;
-            if (ledgerEndDate && dateStr > ledgerEndDate) return false;
-            return true;
-        }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [ledgerData, ledgerStartDate, ledgerEndDate]);
 
     useEffect(() => {
         if (activeTab !== 'reconciliation') return;
@@ -2138,7 +1981,6 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     { id: 'ops2025', label: '2025年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
                     { id: 'ops2026', label: '2026年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
                     { id: 'visitor_stats', label: '訪客統計', icon: <Users className="w-4 h-4 mr-2" />, roles: ['admin'] },
-                    { id: 'ledger', label: '流水賬', icon: <FileText className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
                     { id: 'reconciliation', label: '對帳中心', icon: <DollarSign className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
                     { id: 'marketing', label: '行銷中心', icon: <Megaphone className="w-4 h-4 mr-2" />, roles: ['admin', 'ops'] },
                 ].filter(tab => tab.roles.includes(role)).map((tab) => (
@@ -2579,123 +2421,6 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             </button>
                                         </div>
                                     </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Ledger Tab */}
-            {
-                activeTab === 'ledger' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                                <div>
-                                    <h3 className="text-lg font-bold text-slate-800">流水賬</h3>
-                                    <p className="text-sm text-slate-500">上傳雷門報表後，依區間顯示交易列表</p>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-3">
-                                    <button
-                                        onClick={() => {
-                                            const now = new Date();
-                                            const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                                            const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                            setLedgerStartDate(formatDate(firstDayThisMonth));
-                                            setLedgerEndDate(formatDate(now));
-                                        }}
-                                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
-                                    >
-                                        本月
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            const now = new Date();
-                                            const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                                            const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-                                            const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                            setLedgerStartDate(formatDate(firstDayLastMonth));
-                                            setLedgerEndDate(formatDate(lastDayLastMonth));
-                                        }}
-                                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
-                                    >
-                                        上個月
-                                    </button>
-                                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
-                                        <span className="text-xs text-slate-500">從</span>
-                                        <input
-                                            type="date"
-                                            value={ledgerStartDate}
-                                            onChange={(e) => setLedgerStartDate(e.target.value)}
-                                            className="bg-transparent text-sm text-slate-700 outline-none"
-                                        />
-                                        <span className="text-xs text-slate-500">至</span>
-                                        <input
-                                            type="date"
-                                            value={ledgerEndDate}
-                                            onChange={(e) => setLedgerEndDate(e.target.value)}
-                                            className="bg-transparent text-sm text-slate-700 outline-none"
-                                        />
-                                    </div>
-                                    <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm font-medium cursor-pointer hover:bg-blue-700 transition-colors">
-                                        <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleLedgerUpload} />
-                                        <CloudRain className="w-4 h-4" />
-                                        <span>上傳報表</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            {ledgerData.length === 0 ? (
-                                <div className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                                    <div className="p-4 bg-white rounded-full shadow-sm mb-4">
-                                        <FileText className="w-10 h-10 text-slate-300" />
-                                    </div>
-                                    <h4 className="text-slate-600 font-medium mb-1">尚未載入流水賬</h4>
-                                    <p className="text-slate-400 text-sm mb-6">請上傳雷門報表後查看清單</p>
-                                </div>
-                            ) : ledgerFilteredData.length === 0 ? (
-                                <div className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                                    <div className="p-4 bg-white rounded-full shadow-sm mb-4">
-                                        <FileText className="w-10 h-10 text-slate-300" />
-                                    </div>
-                                    <h4 className="text-slate-600 font-medium mb-1">此區間沒有資料</h4>
-                                    <p className="text-slate-400 text-sm mb-6">請調整區間或重新上傳報表</p>
-                                </div>
-                            ) : (
-                                <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                                    <table className="w-full text-sm">
-                                        <thead className="bg-slate-50 border-b border-slate-200">
-                                            <tr>
-                                                <th className="px-4 py-3 text-left text-slate-600 font-bold">交易時間</th>
-                                                <th className="px-4 py-3 text-left text-slate-600 font-bold">訂單編號</th>
-                                                <th className="px-4 py-3 text-right text-slate-600 font-bold">訂單金額</th>
-                                                <th className="px-4 py-3 text-right text-slate-600 font-bold">發票金額</th>
-                                                <th className="px-4 py-3 text-left text-slate-600 font-bold">交易狀態</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {ledgerFilteredData.map((row, idx) => (
-                                                <tr key={`${row.orderId}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50">
-                                                    <td className="px-4 py-3 text-xs text-slate-600">
-                                                        {row.date ? formatDateInTaipei(row.date) : '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3 font-mono text-slate-700">
-                                                        {row.orderId || '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-right font-mono text-slate-700">
-                                                        {Number.isFinite(row.orderAmount) ? `$${row.orderAmount.toLocaleString()}` : '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-right font-mono text-slate-700">
-                                                        {Number.isFinite(row.invoiceAmount) ? `$${row.invoiceAmount.toLocaleString()}` : '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-slate-600">
-                                                        {row.status || '-'}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
                                 </div>
                             )}
                         </div>
