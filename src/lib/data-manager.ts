@@ -217,6 +217,7 @@ export async function mergeExcelData(fileBuffer: Buffer) {
             payment_method: paymentMethod,
             payment_status: paymentStatus,
             transaction_type: transactionType,
+            invoice_status: String(invoiceStatus || ''),
             remark: String(row['備註'] || row['Remark'] || '')
         };
     }).filter(r => r !== null);

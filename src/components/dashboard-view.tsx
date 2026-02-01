@@ -53,6 +53,7 @@ const normalizeInvoiceIssueType = (val?: string) => {
     if (!raw) return '';
     if (raw.includes('紙本')) return '紙本發票';
     if (raw.includes('載具')) return '存入條碼載具';
+    if (raw.includes('無開立')) return '';
     if (raw === '已開立') return '';
     return raw;
 };
