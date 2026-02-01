@@ -920,6 +920,22 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         return /取消|退款|退刷|作廢/.test(s);
     };
 
+    const isEasyCardAutoTopUp = (row: any) => {
+        const raw = row?.raw || row || {};
+        const candidates = [
+            raw['交易處理代碼'],
+            raw['交易處理代碼 '],
+            raw['交易處理碼'],
+            raw['交易處理代碼/交易處理碼'],
+            raw['交易處理代碼\n'],
+            raw['交易處理代碼\r'],
+            raw['交易處理代碼\r\n']
+        ];
+        const val = candidates.find(v => v !== undefined && v !== null);
+        if (!val) return false;
+        return String(val).includes('825799');
+    };
+
     const handleCompleteReconciliation = async () => {
         if (!reconciliationMatches.length) {
             alert('目前沒有可記錄的對賬資料');
@@ -1347,9 +1363,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                         const mapped = rule.mapRow(cleanRow, rule);
                         if (mapped) {
                             const refundLike = isRefundLikeStatus(mapped.status);
+                            const autoTopUp = reconPaymentMethod === '電子票證-悠遊卡-小額' && isEasyCardAutoTopUp({ raw: cleanRow });
                             return {
                                 ...mapped,
                                 refundLike,
+                                autoTopUp,
                                 raw: cleanRow,
                                 ruleUsed: rule
                             };
@@ -1406,12 +1424,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                         }
                     }
 
+                    const autoTopUp = reconPaymentMethod === '電子票證-悠遊卡-小額' && isEasyCardAutoTopUp({ raw: cleanRow });
                     return {
                         date: dateStr,
                         amount,
                         txId,
                         status,
                         refundLike,
+                        autoTopUp,
                         raw: cleanRow,
                         ruleUsed: rule
                     };
@@ -1458,7 +1478,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 const { data } = parseReconStorageValue(raw);
                 const normalized = Array.isArray(data) ? data.map((item: any) => ({
                     ...item,
-                    refundLike: typeof item.refundLike === 'boolean' ? item.refundLike : isRefundLikeStatus(item.status)
+                    refundLike: typeof item.refundLike === 'boolean' ? item.refundLike : isRefundLikeStatus(item.status),
+                    autoTopUp: typeof item.autoTopUp === 'boolean' ? item.autoTopUp : (reconPaymentMethod === '電子票證-悠遊卡-小額' && isEasyCardAutoTopUp(item))
                 })) : [];
                 applyReconPlatformData(normalized, false);
             } catch (err) {
@@ -1595,6 +1616,13 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         // 4. Add unmatched platform records
         filteredPlatformData.forEach((plat, pIdx) => {
             if (!matchedPlatformIndices.has(pIdx)) {
+                if (plat.autoTopUp) {
+                    matches.push({
+                        platform: plat,
+                        status: 'topup_non_consume'
+                    });
+                    return;
+                }
                 matches.push({
                     platform: plat,
                     status: 'missing_system'
@@ -2701,23 +2729,24 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                         <tbody className="divide-y divide-slate-100">
                                             {reconciliationMatches.map((match, idx) => {
                                                 const isMatched = match.status === 'matched';
+                                                const isTopUp = match.status === 'topup_non_consume';
                                                 const sys = match.system;
                                                 const plat = match.platform;
 
                                                 return (
-                                                    <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${!isMatched ? 'bg-red-50/30' : ''}`}>
+                                                    <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${isTopUp ? 'bg-blue-50/40' : (!isMatched ? 'bg-red-50/30' : '')}`}>
                                                         {/* System Info */}
-                                                        <td className={`px-4 py-3 text-xs ${(!sys || sys.isSalesReturn) ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                                                            {sys ? formatDateInTaipei(sys.date) : '缺失記錄'}
+                                                        <td className={`px-4 py-3 text-xs ${(!sys || sys.isSalesReturn) ? (isTopUp ? 'text-blue-500 font-bold' : 'text-red-500 font-bold') : 'text-slate-500'}`}>
+                                                            {sys ? formatDateInTaipei(sys.date) : isTopUp ? '加值非消費' : '缺失記錄'}
                                                         </td>
-                                                        <td className={`px-4 py-3 font-mono ${(!sys || sys.isSalesReturn) ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
-                                                            {sys?.invoiceNumber || '無發票'}
+                                                        <td className={`px-4 py-3 font-mono ${(!sys || sys.isSalesReturn) ? (isTopUp ? 'text-blue-500 font-bold' : 'text-red-500 font-bold') : 'text-slate-700'}`}>
+                                                            {sys?.invoiceNumber || (isTopUp ? '加值非消費' : '無發票')}
                                                         </td>
-                                                        <td className={`px-4 py-3 text-right font-mono font-medium ${(!sys || sys.isSalesReturn) ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                        <td className={`px-4 py-3 text-right font-mono font-medium ${(!sys || sys.isSalesReturn) ? (isTopUp ? 'text-blue-500 font-bold' : 'text-red-500 font-bold') : 'text-slate-700'}`}>
                                                             {sys ? `$${sys.amount.toLocaleString()}` : '-'}
                                                         </td>
-                                                        <td className={`px-4 py-3 border-r border-slate-200 text-xs ${sys?.isSalesReturn ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
-                                                            {sys?.isSalesReturn ? '銷退' : ''}
+                                                        <td className={`px-4 py-3 border-r border-slate-200 text-xs ${sys?.isSalesReturn ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-400')}`}>
+                                                            {sys?.isSalesReturn ? '銷退' : (isTopUp ? '加值非消費' : '')}
                                                         </td>
 
                                                         {/* Status Icon */}
@@ -2726,6 +2755,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                                 <div className="flex flex-col items-center">
                                                                     <CheckCircle className="w-5 h-5 text-green-500" />
                                                                     <span className="text-[10px] text-green-600 font-bold mt-1">已對齊</span>
+                                                                </div>
+                                                            ) : isTopUp ? (
+                                                                <div className="flex flex-col items-center">
+                                                                    <Zap className="w-5 h-5 text-blue-500" />
+                                                                    <span className="text-[10px] text-blue-600 font-bold mt-1">加值非消費</span>
                                                                 </div>
                                                             ) : (
                                                                 <div className="flex flex-col items-center">
@@ -2736,13 +2770,13 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                         </td>
 
                                                         {/* Platform Info */}
-                                                        <td className={`px-4 py-3 text-xs ${!plat ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                                        <td className={`px-4 py-3 text-xs ${!plat ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-500')}`}>
                                                             {plat ? formatDateInTaipei(plat.date) : '缺失記錄'}
                                                         </td>
-                                                        <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? 'text-red-500 font-bold' : 'text-slate-600'}`} title={plat?.txId}>
+                                                        <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-600')}`} title={plat?.txId}>
                                                             {plat?.txId || '-'}
                                                         </td>
-                                                        <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                        <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
                                                             {plat ? `$${plat.amount.toLocaleString()}` : '-'}
                                                         </td>
                                                         <td className="px-4 py-3 text-center">
