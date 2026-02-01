@@ -806,6 +806,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             loginType: '商店帳戶登入',
             adminAccount: 'lig54987742',
             note: '路徑：財務管理 > 交易記錄 > 報表下載'
+        },
+        {
+            method: '掃碼-LINE Pay',
+            name: 'LINE Pay',
+            url: 'https://pay.line.me/portal/tw/auth/login/id?isEpiSwitchOn=true',
+            loginType: '商店帳戶登入',
+            adminAccount: '1sha_54987742.PS',
+            note: '路徑：資料下載 > 下載交易記錄 > CSV > Download'
         }
     ];
 
