@@ -823,6 +823,17 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             hideLoginType: true,
             adminAccount: 'eddieyang0958',
             note: '路徑：訂單及退款 > 訂單管理 > 搜尋 > 匯出 Excel'
+        },
+        {
+            method: '電子票證-悠遊卡-小額',
+            name: '悠遊卡特約商店服務網',
+            url: 'https://cmas-merchant.easycard.com.tw:7090/logon/login.aspx?type=out',
+            loginType: '特約商店登入',
+            companyIdLabel: '特約商店代號',
+            companyId: '08192728',
+            adminAccountLabel: '請輸入您的登入帳號',
+            adminAccount: '08192728A',
+            note: '路徑：帳號及資料管理 > 商店交易明細 > 匯出 Excel'
         }
     ];
 
@@ -2462,9 +2473,9 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                 <div>登入方式：<span className="text-slate-700 font-semibold">{portal.loginType}</span></div>
                                             )}
                                             {portal.companyId && (
-                                                <div>公司統一編號：<span className="text-slate-700 font-semibold">{portal.companyId}</span></div>
+                                                <div>{portal.companyIdLabel || '公司統一編號'}：<span className="text-slate-700 font-semibold">{portal.companyId}</span></div>
                                             )}
-                                            <div>管理者帳號：<span className="text-slate-700 font-semibold">{portal.adminAccount}</span></div>
+                                            <div>{portal.adminAccountLabel || '管理者帳號'}：<span className="text-slate-700 font-semibold">{portal.adminAccount}</span></div>
                                             {portal.note && (
                                                 <div className="text-slate-400">{portal.note}</div>
                                             )}
