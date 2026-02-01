@@ -752,17 +752,66 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     };
 
     // Reconciliation State
+    const RECON_YEAR = 2026;
     const [platformData, setPlatformData] = useState<any[]>([]);
     const [isMatching, setIsMatching] = useState(false);
-    const [reconStartDate, setReconStartDate] = useState('2026-01-01');
+    const [reconStartDate, setReconStartDate] = useState(`${RECON_YEAR}-01-01`);
     const [reconEndDate, setReconEndDate] = useState<string>(() => {
         const now = new Date();
+        if (now.getFullYear() !== RECON_YEAR) return `${RECON_YEAR}-12-31`;
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     });
     const [reconPaymentMethod, setReconPaymentMethod] = useState<string>('一般信用卡');
     const [inspectedRow, setInspectedRow] = useState<any | null>(null);
     const [isReconLoading, setIsReconLoading] = useState(false);
     const reconDataVersionRef = React.useRef(0);
+    const [reconRecordsIndex, setReconRecordsIndex] = useState<any[]>([]);
+    const [reconRecordDetail, setReconRecordDetail] = useState<any | null>(null);
+    const [isReconRecordLoading, setIsReconRecordLoading] = useState(false);
+
+    const reconPlatforms = [
+        '一般信用卡',
+        '掃碼-全支付',
+        '掃碼-街口支付',
+        '掃碼-LINE Pay',
+        '掃碼-悠遊付',
+        '電子票證-悠遊卡-小額',
+        '電子票證-一卡通-小額',
+        '掃碼-iPass MONEY'
+    ];
+
+    const formatDateValue = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    const getReconMonthLabel = (monthIndex: number) => `${monthIndex + 1}月`;
+
+    const generateReconRecordId = () => {
+        if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+            return crypto.randomUUID();
+        }
+        return `recon_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    };
+
+    const serializeReconMatches = (matches: any[]) => matches.map(m => ({
+        status: m.status,
+        system: m.system ? {
+            id: m.system.id,
+            invoiceNumber: m.system.invoiceNumber,
+            date: m.system.date,
+            amount: m.system.amount,
+            paymentMethod: m.system.paymentMethod,
+            type: m.system.type,
+            paymentStatus: m.system.paymentStatus,
+            invoiceStatus: m.system.invoiceStatus,
+            orderId: m.system.orderId,
+            isSalesReturn: m.system.isSalesReturn || false
+        } : null,
+        platform: m.platform ? {
+            date: m.platform.date,
+            amount: m.platform.amount,
+            txId: m.platform.txId,
+            status: m.platform.status
+        } : null
+    }));
 
 
     const toBase64Url = (input: string) => {
@@ -807,6 +856,60 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     const applyReconPlatformData = (data: any[], markUpdated = false) => {
         if (markUpdated) reconDataVersionRef.current += 1;
         setPlatformData(data);
+    };
+
+    const handleCompleteReconciliation = async () => {
+        if (!reconciliationMatches.length) {
+            alert('目前沒有可記錄的對賬資料');
+            return;
+        }
+        try {
+            const id = generateReconRecordId();
+            const recordMonth = reconStartDate.slice(0, 7);
+            const reconciledAt = new Date().toISOString();
+            const payload = {
+                id,
+                method: reconPaymentMethod,
+                month: recordMonth,
+                rangeStart: reconStartDate,
+                rangeEnd: reconEndDate,
+                reconciledAt,
+                matches: serializeReconMatches(reconciliationMatches)
+            };
+
+            const indexItem = {
+                id,
+                method: reconPaymentMethod,
+                month: recordMonth,
+                rangeStart: reconStartDate,
+                rangeEnd: reconEndDate,
+                reconciledAt
+            };
+
+            const nextIndex = [...reconRecordsIndex, indexItem];
+            setReconRecordsIndex(nextIndex);
+            await updateSystemConfig(`recon_record_${id}`, JSON.stringify(payload));
+            await updateSystemConfig(`recon_record_index_${RECON_YEAR}`, JSON.stringify(nextIndex));
+            alert('已完成對賬並記錄');
+        } catch (e) {
+            console.error('Failed to save reconciliation record', e);
+            alert('記錄失敗，請稍後再試');
+        }
+    };
+
+    const handleOpenReconRecord = async (recordId: string) => {
+        setIsReconRecordLoading(true);
+        try {
+            const raw = await getSystemConfig(`recon_record_${recordId}`, null);
+            if (!raw) return;
+            const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            setReconRecordDetail(parsed);
+        } catch (e) {
+            console.error('Failed to load reconciliation record', e);
+            alert('讀取對賬記錄失敗');
+        } finally {
+            setIsReconRecordLoading(false);
+        }
     };
 
     // Platform Reconciliation Rules Configuration
@@ -1297,14 +1400,28 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             }
         };
 
+        const loadReconIndex = async () => {
+            try {
+                const raw = await getSystemConfig(`recon_record_index_${RECON_YEAR}`, '[]');
+                if (cancelled) return;
+                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                setReconRecordsIndex(Array.isArray(parsed) ? parsed : []);
+            } catch (e) {
+                console.error('Failed to load recon index', e);
+                if (!cancelled) setReconRecordsIndex([]);
+            }
+        };
+
         loadPlatformData();
+        loadReconIndex();
         return () => {
             cancelled = true;
         };
-    }, [activeTab, reconPaymentMethod]);
+    }, [activeTab, reconPaymentMethod, RECON_YEAR]);
 
     const reconSystemRecords = useMemo(() => {
         return parsedData.filter(t => {
+            if (t.year !== RECON_YEAR) return false;
             // Case-insensitive payment method matching
             const sysMethod = (t.paymentMethod || '').toLowerCase();
             const targetMethod = reconPaymentMethod.toLowerCase();
@@ -1318,7 +1435,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             if (reconEndDate && dateStr > reconEndDate) return false;
             return true;
         });
-    }, [parsedData, reconPaymentMethod, reconStartDate, reconEndDate]);
+    }, [parsedData, reconPaymentMethod, reconStartDate, reconEndDate, RECON_YEAR]);
 
     const reconciliationMatches = useMemo(() => {
         // 1. Use filtered system records for Selected Payment Method AND date range
@@ -1392,6 +1509,24 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             return timeB - timeA; // Descending
         });
     }, [platformData, reconStartDate, reconEndDate, reconSystemRecords, reconPaymentMethod]);
+
+    const reconMonths = useMemo(() => (
+        Array.from({ length: 12 }, (_, i) => `${RECON_YEAR}-${String(i + 1).padStart(2, '0')}`)
+    ), [RECON_YEAR]);
+
+    const reconMonthlyLatest = useMemo(() => {
+        const map = new Map<string, any>();
+        reconRecordsIndex.forEach((record) => {
+            if (!record?.month || !record?.method || !record?.reconciledAt) return;
+            if (!String(record.month).startsWith(`${RECON_YEAR}-`)) return;
+            const key = `${record.month}__${record.method}`;
+            const existing = map.get(key);
+            if (!existing || new Date(record.reconciledAt).getTime() > new Date(existing.reconciledAt).getTime()) {
+                map.set(key, record);
+            }
+        });
+        return map;
+    }, [reconRecordsIndex, RECON_YEAR]);
 
     useEffect(() => {
         let year = 0;
@@ -2042,7 +2177,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     { id: 'ops2025', label: '2025年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
                     { id: 'ops2026', label: '2026年運營', icon: <Calendar className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
                     { id: 'invoice', label: '發票稽核', icon: <AlertTriangle className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
-                    { id: 'reconciliation', label: '對帳中心', icon: <DollarSign className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
+                    { id: 'reconciliation', label: `${RECON_YEAR}對賬中心`, icon: <DollarSign className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
                     { id: 'visitor_stats', label: '訪客統計', icon: <Users className="w-4 h-4 mr-2" />, roles: ['admin'] },
                     { id: 'marketing', label: '行銷中心', icon: <Megaphone className="w-4 h-4 mr-2" />, roles: ['admin', 'ops'] },
                 ].filter(tab => tab.roles.includes(role)).map((tab) => (
@@ -2209,6 +2344,67 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             {
                 activeTab === 'reconciliation' && (
                     <div className="space-y-6 animate-in fade-in duration-500 print:m-0 print:p-0">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 no-print">
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-800">{RECON_YEAR}對賬進度總覽</h3>
+                                    <p className="text-sm text-slate-500">按月份與平台顯示最新完成對賬時間</p>
+                                </div>
+                                {isReconRecordLoading && (
+                                    <div className="text-xs text-slate-400">對賬記錄載入中...</div>
+                                )}
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-4 py-3 w-20">月份</th>
+                                            {reconPlatforms.map((p) => (
+                                                <th key={p} className="px-4 py-3 text-center whitespace-nowrap">{p}</th>
+                                            ))}
+                                            <th className="px-4 py-3 w-56">備註說明</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {reconMonths.map((monthStr, idx) => {
+                                            const monthLatest = reconPlatforms.reduce((latest: any | null, method) => {
+                                                const record = reconMonthlyLatest.get(`${monthStr}__${method}`);
+                                                if (!record) return latest;
+                                                if (!latest) return record;
+                                                return new Date(record.reconciledAt).getTime() > new Date(latest.reconciledAt).getTime() ? record : latest;
+                                            }, null);
+
+                                            return (
+                                                <tr key={monthStr} className="hover:bg-slate-50/50">
+                                                    <td className="px-4 py-3 font-medium text-slate-700">{getReconMonthLabel(idx)}</td>
+                                                    {reconPlatforms.map((method) => {
+                                                        const record = reconMonthlyLatest.get(`${monthStr}__${method}`);
+                                                        return (
+                                                            <td key={method} className="px-4 py-3 text-center">
+                                                                {record ? (
+                                                                    <button
+                                                                        onClick={() => handleOpenReconRecord(record.id)}
+                                                                        className="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
+                                                                    >
+                                                                        {formatDateInTaipei(record.reconciledAt)}
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className="text-slate-300">—</span>
+                                                                )}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                    <td className="px-4 py-3 text-xs text-slate-500">
+                                                        {monthLatest ? `${monthLatest.method} (${monthLatest.rangeStart} ~ ${monthLatest.rangeEnd})` : '尚未對賬'}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         {/* Print CSS */}
                         <style dangerouslySetInnerHTML={{
                             __html: `
@@ -2236,18 +2432,20 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 print-section">
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 no-print">
                                 <div>
-                                    <h3 className="text-lg font-bold text-slate-800">對帳中心</h3>
-                                    <p className="text-sm text-slate-500">比對系統發票與平台交易數據 (依金額及時間自動匹配)</p>
+                                    <h3 className="text-lg font-bold text-slate-800">{RECON_YEAR}對賬中心</h3>
+                                    <p className="text-sm text-slate-500">僅針對 {RECON_YEAR} 年度，比對系統發票與平台交易數據 (依金額及時間自動匹配)</p>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-3">
                                     <button
                                         onClick={() => {
                                             const now = new Date();
-                                            const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                                            const lastDayThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                                            const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                            setReconStartDate(formatDate(firstDayThisMonth));
-                                            setReconEndDate(formatDate(lastDayThisMonth));
+                                            const baseMonth = now.getMonth();
+                                            const lastDayThisMonth = new Date(RECON_YEAR, baseMonth + 1, 0);
+                                            const today = Math.min(now.getDate(), lastDayThisMonth.getDate());
+                                            const firstDayThisMonth = new Date(RECON_YEAR, baseMonth, 1);
+                                            const endDay = new Date(RECON_YEAR, baseMonth, today);
+                                            setReconStartDate(formatDateValue(firstDayThisMonth));
+                                            setReconEndDate(formatDateValue(endDay));
                                         }}
                                         className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
                                     >
@@ -2256,11 +2454,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                     <button
                                         onClick={() => {
                                             const now = new Date();
-                                            const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                                            const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-                                            const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                            setReconStartDate(formatDate(firstDayLastMonth));
-                                            setReconEndDate(formatDate(lastDayLastMonth));
+                                            const baseMonth = now.getMonth() - 1;
+                                            const firstDayLastMonth = new Date(RECON_YEAR, baseMonth, 1);
+                                            const lastDayLastMonth = new Date(RECON_YEAR, baseMonth + 1, 0);
+                                            setReconStartDate(formatDateValue(firstDayLastMonth));
+                                            setReconEndDate(formatDateValue(lastDayLastMonth));
                                         }}
                                         className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
                                     >
@@ -2272,6 +2470,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             type="date"
                                             value={reconStartDate}
                                             onChange={(e) => setReconStartDate(e.target.value)}
+                                            min={`${RECON_YEAR}-01-01`}
+                                            max={`${RECON_YEAR}-12-31`}
                                             className="bg-transparent text-sm text-slate-700 outline-none"
                                         />
                                         <span className="text-xs text-slate-500">至</span>
@@ -2279,6 +2479,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             type="date"
                                             value={reconEndDate}
                                             onChange={(e) => setReconEndDate(e.target.value)}
+                                            min={`${RECON_YEAR}-01-01`}
+                                            max={`${RECON_YEAR}-12-31`}
                                             className="bg-transparent text-sm text-slate-700 outline-none"
                                         />
                                     </div>
@@ -2420,13 +2622,22 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
                             {platformData.length > 0 && (
                                 <div className="mt-6 flex items-center justify-between no-print">
-                                    <button
-                                        onClick={() => window.print()}
-                                        className="flex items-center gap-2 px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-all shadow-lg active:scale-95"
-                                    >
-                                        <Printer className="w-4 h-4" />
-                                        <span>列印對帳狀態</span>
-                                    </button>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => window.print()}
+                                            className="flex items-center gap-2 px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-all shadow-lg active:scale-95"
+                                        >
+                                            <Printer className="w-4 h-4" />
+                                            <span>列印對賬狀態</span>
+                                        </button>
+                                        <button
+                                            onClick={handleCompleteReconciliation}
+                                            className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
+                                        >
+                                            <CheckCircle className="w-4 h-4" />
+                                            <span>完成對賬</span>
+                                        </button>
+                                    </div>
 
                                     <button
                                         onClick={async () => {
@@ -2477,6 +2688,116 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                         <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
                                             <button
                                                 onClick={() => setInspectedRow(null)}
+                                                className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg"
+                                            >
+                                                關閉
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {reconRecordDetail && (
+                                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden">
+                                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                                            <div>
+                                                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                                    <Info className="w-5 h-5 text-blue-500" />
+                                                    對賬記錄
+                                                </h3>
+                                                <p className="text-xs text-slate-500 mt-1">
+                                                    {reconRecordDetail.method} / {reconRecordDetail.month}
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => setReconRecordDetail(null)}
+                                                className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+                                            >
+                                                <X className="w-5 h-5 text-slate-500" />
+                                            </button>
+                                        </div>
+                                        <div className="p-6 overflow-y-auto space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                                    <div className="text-xs text-slate-500">對賬時間</div>
+                                                    <div className="font-semibold text-slate-700">{formatDateInTaipei(reconRecordDetail.reconciledAt)}</div>
+                                                </div>
+                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                                    <div className="text-xs text-slate-500">對賬區間</div>
+                                                    <div className="font-semibold text-slate-700">{reconRecordDetail.rangeStart} ~ {reconRecordDetail.rangeEnd}</div>
+                                                </div>
+                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                                    <div className="text-xs text-slate-500">付款方式</div>
+                                                    <div className="font-semibold text-slate-700">{reconRecordDetail.method}</div>
+                                                </div>
+                                            </div>
+
+                                            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                                                <table className="w-full text-sm">
+                                                    <thead className="bg-slate-50 border-b border-slate-200">
+                                                        <tr>
+                                                            <th className="px-4 py-3 text-center border-r border-slate-200 w-24">對賬狀態</th>
+                                                            <th className="px-4 py-3 text-slate-600 font-bold">系統交易時間</th>
+                                                            <th className="px-4 py-3 text-slate-600 font-bold">訂單編號</th>
+                                                            <th className="px-4 py-3 text-right text-slate-600 font-bold">系統金額</th>
+                                                            <th className="px-4 py-3 text-slate-600 font-bold">發票號碼</th>
+                                                            <th className="px-4 py-3 text-slate-600 font-bold">平台交易時間</th>
+                                                            <th className="px-4 py-3 text-slate-600 font-bold">平台序號</th>
+                                                            <th className="px-4 py-3 text-right text-slate-600 font-bold">平台金額</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {reconRecordDetail.matches?.map((match: any, idx: number) => {
+                                                            const sys = match.system;
+                                                            const plat = match.platform;
+                                                            const status = match.status;
+                                                            return (
+                                                                <tr key={`${match.status}-${idx}`} className="hover:bg-slate-50">
+                                                                    <td className="px-4 py-3 text-center border-r border-slate-200">
+                                                                        {status === 'matched' ? (
+                                                                            <div className="flex flex-col items-center">
+                                                                                <CheckCircle className="w-5 h-5 text-emerald-500" />
+                                                                                <span className="text-[10px] text-emerald-600 font-bold mt-1">已匹配</span>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="flex flex-col items-center">
+                                                                                <AlertTriangle className="w-5 h-5 text-red-500" />
+                                                                                <span className="text-[10px] text-red-600 font-bold mt-1">未匹配</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className={`px-4 py-3 text-xs ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
+                                                                        {sys ? formatDateInTaipei(sys.date) : '缺失記錄'}
+                                                                    </td>
+                                                                    <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
+                                                                        {sys?.id || '-'}
+                                                                    </td>
+                                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${!sys ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                                        {sys ? `$${Number(sys.amount).toLocaleString()}` : '-'}
+                                                                    </td>
+                                                                    <td className={`px-4 py-3 font-mono ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
+                                                                        {sys?.invoiceNumber || '無發票'}
+                                                                    </td>
+                                                                    <td className={`px-4 py-3 text-xs ${!plat ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                                                        {plat ? formatDateInTaipei(plat.date) : '缺失記錄'}
+                                                                    </td>
+                                                                    <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
+                                                                        {plat?.txId || '-'}
+                                                                    </td>
+                                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                                        {plat ? `$${Number(plat.amount).toLocaleString()}` : '-'}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                                            <button
+                                                onClick={() => setReconRecordDetail(null)}
                                                 className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg"
                                             >
                                                 關閉
