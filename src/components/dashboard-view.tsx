@@ -1547,7 +1547,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         });
 
         const matchedPlatformIndices = new Set<number>();
-        const matches: { system?: any, platform?: any, status: 'matched' | 'mismatch' | 'missing_system' | 'missing_platform' }[] = [];
+        const matches: { system?: any, platform?: any, status: 'matched' | 'mismatch' | 'missing_system' | 'missing_platform' | 'topup_non_consume' }[] = [];
 
         // 3. Try to match each system record
         systemRecords.forEach(sys => {
