@@ -965,7 +965,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         '掃碼-街口支付': {
             dateFields: ['交易時間', '日期'],
             timeFields: ['時間'],
-            amountFields: ['支付金額', '訂單金額', '金額'],
+            amountFields: ['訂單金額', '支付金額', '金額'],
             idFields: ['訂單編號', '廠商端訂單編號'],
             statusFields: ['交易行為', '狀態'],
             successStatuses: ['支付', '成功', 'SUCCESS', 'Paid', '交易成功'],
