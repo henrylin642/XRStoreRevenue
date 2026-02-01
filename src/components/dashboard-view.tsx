@@ -814,6 +814,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             loginType: '商店帳戶登入',
             adminAccount: '1sha_54987742.PS',
             note: '路徑：資料下載 > 下載交易記錄 > CSV > Download'
+        },
+        {
+            method: '掃碼-悠遊付',
+            name: '悠遊付 EasyCard',
+            url: 'https://epmem.easycard.com.tw/',
+            loginType: '商店帳戶登入',
+            adminAccount: 'eddieyang0958',
+            note: '路徑：訂單及退款 > 訂單管理 > 搜尋 > 匯出 Excel'
         }
     ];
 
