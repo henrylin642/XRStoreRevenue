@@ -834,6 +834,17 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             adminAccountLabel: '請輸入您的登入帳號',
             adminAccount: '08192728A',
             note: '路徑：帳號及資料管理 > 商店交易明細 > 匯出 Excel'
+        },
+        {
+            method: '電子票證-一卡通-小額',
+            name: '一卡通特約商店服務網',
+            url: 'https://taps-shop.i-pass.com.tw/Logon/Login.aspx',
+            loginType: '特約商店登入',
+            companyIdLabel: '特約商店代號',
+            companyId: 'AD016F18',
+            adminAccountLabel: '請輸入您的登入帳號',
+            adminAccount: 'AD016F18A',
+            note: '路徑：帳號及資料管理 > 商店交易明細 > 匯出 Excel'
         }
     ];
 
