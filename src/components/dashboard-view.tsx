@@ -780,6 +780,17 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         '掃碼-iPass MONEY'
     ];
 
+    const reconPlatformPortals = [
+        {
+            method: '一般信用卡',
+            name: '藍新金流 NewebPay',
+            url: 'https://www.newebpay.com/main/login_center/single_login?backurl=aHR0cHM6Ly93d3cubmV3ZWJwYXkuY29tL2luZGV4LnBocC9zYWxlL1NlbGxfY2VudGVyL3NlYXJjaF90cmFuc2FjdGlvbg==',
+            loginType: '企業會員登入',
+            companyId: '54987742',
+            adminAccount: 'lig54987742'
+        }
+    ];
+
     const formatDateValue = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     const getReconMonthLabel = (monthIndex: number) => `${monthIndex + 1}月`;
@@ -2360,6 +2371,40 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             {
                 activeTab === 'reconciliation' && (
                     <div className="space-y-6 animate-in fade-in duration-500 print:m-0 print:p-0">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 no-print">
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-800">平台後台快速入口</h3>
+                                    <p className="text-sm text-slate-500">僅顯示授權平台連結，供管理者下載對賬報表</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {reconPlatformPortals.map((portal) => (
+                                    <div key={portal.method} className="border border-slate-200 rounded-xl p-4 flex flex-col gap-3">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <div className="text-sm font-bold text-slate-700">{portal.method}</div>
+                                                <div className="text-xs text-slate-400">{portal.name}</div>
+                                            </div>
+                                            <a
+                                                href={portal.url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors"
+                                            >
+                                                前往後台
+                                            </a>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-2 text-xs text-slate-500">
+                                            <div>登入方式：<span className="text-slate-700 font-semibold">{portal.loginType}</span></div>
+                                            <div>公司統一編號：<span className="text-slate-700 font-semibold">{portal.companyId}</span></div>
+                                            <div>管理者帳號：<span className="text-slate-700 font-semibold">{portal.adminAccount}</span></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 no-print">
                             <div className="flex items-center justify-between mb-4">
                                 <div>
