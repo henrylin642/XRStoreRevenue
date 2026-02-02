@@ -1582,6 +1582,16 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             let minDiff = 60 * 1000; // 60 seconds tolerance
             const sysRefundLike = sys.amount < 0 || /退款|取消|退刷|作廢/.test(String(sys.type || sys.paymentStatus || ''));
 
+            // Special handling for General Credit Card: Refunds are NOT recorded by platform.
+            // DO NOT attempt to match them, as they might wrongly match with a positive transaction of the same absolute amount.
+            if (reconPaymentMethod === '一般信用卡' && (sysWithMeta.isSalesReturn || sysRefundLike)) {
+                matches.push({
+                    system: sysWithMeta,
+                    status: 'refund_skipped'
+                });
+                return; // Skip finding match
+            }
+
             const findBestMatch = (refundPreference: boolean | null) => {
                 let candidateIdx = -1;
                 let candidateDiff = 60 * 1000;
@@ -1625,18 +1635,10 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     status: 'matched'
                 });
             } else {
-                // Special handling for General Credit Card refunds which are not recorded by platform
-                if (reconPaymentMethod === '一般信用卡' && (sysWithMeta.isSalesReturn || sysRefundLike)) {
-                    matches.push({
-                        system: sysWithMeta,
-                        status: 'refund_skipped'
-                    });
-                } else {
-                    matches.push({
-                        system: sysWithMeta,
-                        status: 'missing_platform'
-                    });
-                }
+                matches.push({
+                    system: sysWithMeta,
+                    status: 'missing_platform'
+                });
             }
         });
 
