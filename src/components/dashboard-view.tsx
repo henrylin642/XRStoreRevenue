@@ -19,6 +19,7 @@ import { HOLIDAY_DATA_2026, getDailyRemark, isPublicHoliday } from '@/lib/holida
 import { updateDailyVisitorCount } from '@/app/actions/visitor-actions';
 import { getSystemConfig, updateSystemConfig, getSystemConfigsByPattern } from '@/app/actions/config-actions';
 import { OperationsExcelImporter } from './operations-excel-importer';
+import { BackupManager } from './backup-manager';
 import { AiCfoChat } from './ai-cfo-chat';
 
 interface DashboardViewProps {
@@ -2263,6 +2264,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                         </select>
 
                         <OperationsExcelImporter />
+                        <BackupManager />
                         <UploadButton />
 
                         <button
