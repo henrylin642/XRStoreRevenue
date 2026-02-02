@@ -3052,10 +3052,10 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             </div>
                                         )
                                     }
-                                </div >
-                            </div >
+                                </div>
+                            </>
                         )
-}
+                        }
 
                         {/* Growth Tab */}
                         {
