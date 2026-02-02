@@ -1566,7 +1566,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         });
 
         const matchedPlatformIndices = new Set<number>();
-        const matches: { system?: any, platform?: any, status: 'matched' | 'mismatch' | 'missing_system' | 'missing_platform' | 'topup_non_consume' }[] = [];
+        const matches: { system?: any, platform?: any, status: 'matched' | 'mismatch' | 'missing_system' | 'missing_platform' | 'topup_non_consume' | 'refund_skipped' }[] = [];
 
         // 3. Try to match each system record
         systemRecords.forEach(sys => {
@@ -1625,10 +1625,18 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     status: 'matched'
                 });
             } else {
-                matches.push({
-                    system: sysWithMeta,
-                    status: 'missing_platform'
-                });
+                // Special handling for General Credit Card refunds which are not recorded by platform
+                if (reconPaymentMethod === '一般信用卡' && (sysWithMeta.isSalesReturn || sysRefundLike)) {
+                    matches.push({
+                        system: sysWithMeta,
+                        status: 'refund_skipped'
+                    });
+                } else {
+                    matches.push({
+                        system: sysWithMeta,
+                        status: 'missing_platform'
+                    });
+                }
             }
         });
 
@@ -2749,22 +2757,25 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                             {reconciliationMatches.map((match, idx) => {
                                                 const isMatched = match.status === 'matched';
                                                 const isTopUp = match.status === 'topup_non_consume';
+                                                const isRefundSkipped = match.status === 'refund_skipped';
                                                 const sys = match.system;
                                                 const plat = match.platform;
 
+                                                const isError = !isMatched && !isTopUp && !isRefundSkipped;
+
                                                 return (
-                                                    <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${isTopUp ? 'bg-blue-50/40' : (!isMatched ? 'bg-red-50/30' : '')}`}>
+                                                    <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${isTopUp ? 'bg-blue-50/40' : (isError ? 'bg-red-50/30' : '')}`}>
                                                         {/* System Info */}
-                                                        <td className={`px-4 py-3 text-xs ${(!sys || sys.isSalesReturn) ? (isTopUp ? 'text-blue-500 font-bold' : 'text-red-500 font-bold') : 'text-slate-500'}`}>
+                                                        <td className={`px-4 py-3 text-xs ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-500')}`}>
                                                             {sys ? formatDateInTaipei(sys.date) : isTopUp ? '加值非消費' : '缺失記錄'}
                                                         </td>
-                                                        <td className={`px-4 py-3 font-mono ${(!sys || sys.isSalesReturn) ? (isTopUp ? 'text-blue-500 font-bold' : 'text-red-500 font-bold') : 'text-slate-700'}`}>
+                                                        <td className={`px-4 py-3 font-mono ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
                                                             {sys?.invoiceNumber || (isTopUp ? '加值非消費' : '無發票')}
                                                         </td>
-                                                        <td className={`px-4 py-3 text-right font-mono font-medium ${(!sys || sys.isSalesReturn) ? (isTopUp ? 'text-blue-500 font-bold' : 'text-red-500 font-bold') : 'text-slate-700'}`}>
+                                                        <td className={`px-4 py-3 text-right font-mono font-medium ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
                                                             {sys ? `$${sys.amount.toLocaleString()}` : '-'}
                                                         </td>
-                                                        <td className={`px-4 py-3 border-r border-slate-200 text-xs ${sys?.isSalesReturn ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-400')}`}>
+                                                        <td className={`px-4 py-3 border-r border-slate-200 text-xs ${sys?.isSalesReturn ? (isError ? 'text-red-500 font-bold' : 'text-amber-600 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-400')}`}>
                                                             {sys?.isSalesReturn ? '銷退' : (isTopUp ? '加值非消費' : '')}
                                                         </td>
 
@@ -2780,6 +2791,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                                     <Zap className="w-5 h-5 text-blue-500" />
                                                                     <span className="text-[10px] text-blue-600 font-bold mt-1">加值非消費</span>
                                                                 </div>
+                                                            ) : isRefundSkipped ? (
+                                                                <div className="flex flex-col items-center">
+                                                                    <CheckCircle className="w-5 h-5 text-amber-500" />
+                                                                    <span className="text-[10px] text-amber-600 font-bold mt-1">平台不計</span>
+                                                                </div>
                                                             ) : (
                                                                 <div className="flex flex-col items-center">
                                                                     <AlertTriangle className="w-5 h-5 text-red-500" />
@@ -2789,14 +2805,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                         </td>
 
                                                         {/* Platform Info */}
-                                                        <td className={`px-4 py-3 text-xs ${!plat ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-500')}`}>
-                                                            {plat ? formatDateInTaipei(plat.date) : '缺失記錄'}
+                                                        <td className={`px-4 py-3 text-xs ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-500')}`}>
+                                                            {plat ? formatDateInTaipei(plat.date) : (isRefundSkipped ? '-' : '缺失記錄')}
                                                         </td>
-                                                        <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-600')}`} title={plat?.txId}>
-                                                            {plat?.txId || '-'}
+                                                        <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-600')}`} title={plat?.txId}>
+                                                            {plat?.txId || (isRefundSkipped ? '-' : '-')}
                                                         </td>
-                                                        <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
-                                                            {plat ? `$${plat.amount.toLocaleString()}` : '-'}
+                                                        <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
+                                                            {plat ? `$${plat.amount.toLocaleString()}` : (isRefundSkipped ? '-' : '-')}
                                                         </td>
                                                         <td className="px-4 py-3 text-center">
                                                             {plat && (
@@ -2957,6 +2973,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                                                 <CheckCircle className="w-5 h-5 text-emerald-500" />
                                                                                 <span className="text-[10px] text-emerald-600 font-bold mt-1">已匹配</span>
                                                                             </div>
+                                                                        ) : status === 'refund_skipped' ? (
+                                                                            <div className="flex flex-col items-center">
+                                                                                <CheckCircle className="w-5 h-5 text-amber-500" />
+                                                                                <span className="text-[10px] text-amber-600 font-bold mt-1">平台不計</span>
+                                                                            </div>
                                                                         ) : (
                                                                             <div className="flex flex-col items-center">
                                                                                 <AlertTriangle className="w-5 h-5 text-red-500" />
@@ -2976,14 +2997,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                                                     <td className={`px-4 py-3 font-mono ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
                                                                         {sys?.invoiceNumber || '無發票'}
                                                                     </td>
-                                                                    <td className={`px-4 py-3 text-xs ${!plat ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                                                                        {plat ? formatDateInTaipei(plat.date) : '缺失記錄'}
+                                                                    <td className={`px-4 py-3 text-xs ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-500'}`}>
+                                                                        {plat ? formatDateInTaipei(plat.date) : (status === 'refund_skipped' ? '-' : '缺失記錄')}
                                                                     </td>
-                                                                    <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
-                                                                        {plat?.txId || '-'}
+                                                                    <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-600'}`}>
+                                                                        {plat?.txId || (status === 'refund_skipped' ? '-' : '-')}
                                                                     </td>
-                                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
-                                                                        {plat ? `$${Number(plat.amount).toLocaleString()}` : '-'}
+                                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-700'}`}>
+                                                                        {plat ? `$${Number(plat.amount).toLocaleString()}` : (status === 'refund_skipped' ? '-' : '-')}
                                                                     </td>
                                                                 </tr>
                                                             );
