@@ -2295,12 +2295,12 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
                 <Card title="體驗人次"
                     value={`${overviewStats.totalVisitors.toLocaleString()} 人`}
-                    sub="含所有遊戲項目"
+                    sub={overviewStats.totalVisitors === 0 ? "尚無數據 (請至營運分頁輸入)" : "含所有遊戲項目"}
                     icon={<Users className="w-8 h-8 text-purple-500 opacity-80" />} />
 
                 <Card title="每人次客單價 (RPV)"
                     value={`$${overviewStats.revenuePerVisitor.toLocaleString()}`}
-                    sub="平均每位訪客貢獻"
+                    sub={overviewStats.totalVisitors === 0 ? "需累積人次數據" : "平均每位訪客貢獻"}
                     icon={<TrendingUp className="w-8 h-8 text-rose-500 opacity-80" />} />
 
                 <Card title="累計應收 (預計)"
