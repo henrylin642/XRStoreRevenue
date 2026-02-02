@@ -1584,7 +1584,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
 
             // Special handling for General Credit Card: Refunds are NOT recorded by platform.
             // DO NOT attempt to match them, as they might wrongly match with a positive transaction of the same absolute amount.
-            if (reconPaymentMethod === '一般信用卡' && (sysWithMeta.isSalesReturn || sysRefundLike)) {
+            // ONLY skip if the amount is actually negative.
+            // Sometimes a "correction" sales return might be positive in some systems (unlikely but safe to check),
+            // or if it's just a flag but amount is positive, we still want to match it.
+            // But here, the issue is specifically about negative refund entries (-$X) being matched to positive platform entries (+$X).
+            if (reconPaymentMethod === '一般信用卡' && sys.amount < 0) {
                 matches.push({
                     system: sysWithMeta,
                     status: 'refund_skipped'
