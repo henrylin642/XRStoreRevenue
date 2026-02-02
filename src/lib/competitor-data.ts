@@ -244,6 +244,7 @@ export const COMPETITOR_DATA: FacilityBenchmark[] = [
         operator: '雷克士嘉年華',
         category: 'carnival_game',
         price: { base: 100, mode: 'tiered', details: '1球100, 3球200, 6球300', currency: 'TWD' },
+        duration_min: 1,
         note: '投進1球即贏得獎品'
     },
     {
@@ -252,7 +253,8 @@ export const COMPETITOR_DATA: FacilityBenchmark[] = [
         location: '3樓轉轉咖啡杯旁',
         operator: '雷克士嘉年華',
         category: 'carnival_game',
-        price: { base: 200, mode: 'fixed', details: '5枚飛鏢200元', currency: 'TWD' }
+        price: { base: 200, mode: 'fixed', details: '5枚飛鏢200元', currency: 'TWD' },
+        duration_min: 2
     },
     {
         id: 'carnival_ring',
@@ -260,7 +262,8 @@ export const COMPETITOR_DATA: FacilityBenchmark[] = [
         location: '3樓轉轉咖啡杯旁',
         operator: '雷克士嘉年華',
         category: 'carnival_game',
-        price: { base: 100, mode: 'tiered', details: '8個100, 24個200, 2桶300', currency: 'TWD' }
+        price: { base: 100, mode: 'tiered', details: '8個100, 24個200, 2桶300', currency: 'TWD' },
+        duration_min: 2
     },
     {
         id: 'carnival_lobster',
@@ -268,7 +271,8 @@ export const COMPETITOR_DATA: FacilityBenchmark[] = [
         location: '3樓巡弋飛椅旁',
         operator: '雷克士嘉年華',
         category: 'carnival_game',
-        price: { base: 100, mode: 'tiered', details: '1局100, 3局200, 6局300', currency: 'TWD' }
+        price: { base: 100, mode: 'tiered', details: '1局100, 3局200, 6局300', currency: 'TWD' },
+        duration_min: 2
     },
     {
         id: 'carnival_hook',
@@ -276,7 +280,8 @@ export const COMPETITOR_DATA: FacilityBenchmark[] = [
         location: '3樓轉轉咖啡杯旁',
         operator: '雷克士嘉年華',
         category: 'carnival_game',
-        price: { base: 200, mode: 'fixed', details: '撈5隻鴨200元', currency: 'TWD' }
+        price: { base: 200, mode: 'fixed', details: '撈5隻鴨200元', currency: 'TWD' },
+        duration_min: 3
     },
     {
         id: 'carnival_pyramid',
@@ -284,7 +289,8 @@ export const COMPETITOR_DATA: FacilityBenchmark[] = [
         location: '3樓巡弋飛椅旁',
         operator: '雷克士嘉年華',
         category: 'carnival_game',
-        price: { base: 100, mode: 'tiered', details: '1局100, 3局200, 6局300', currency: 'TWD' }
+        price: { base: 100, mode: 'tiered', details: '1局100, 3局200, 6局300', currency: 'TWD' },
+        duration_min: 2
     },
     {
         id: 'carnival_pinball',
@@ -293,6 +299,7 @@ export const COMPETITOR_DATA: FacilityBenchmark[] = [
         operator: '鈊洲娛樂',
         category: 'carnival_game',
         price: { base: 100, mode: 'tiered', details: '100-300元', currency: 'TWD' },
+        duration_min: 5,
         note: '不適用一日樂Fun券'
     },
     {
@@ -301,7 +308,8 @@ export const COMPETITOR_DATA: FacilityBenchmark[] = [
         location: '1樓/2樓/3樓',
         operator: '鈊洲娛樂',
         category: 'carnival_game',
-        price: { base: 15, mode: 'tiered', details: '15-40元為主', currency: 'TWD' }
+        price: { base: 15, mode: 'tiered', details: '15-40元為主', currency: 'TWD' },
+        duration_min: 3
     },
 
     // --- Level 4: Indoor/Package (室內/套票) ---
