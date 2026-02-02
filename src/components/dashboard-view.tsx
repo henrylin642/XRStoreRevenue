@@ -19,6 +19,7 @@ import { HOLIDAY_DATA_2026, getDailyRemark, isPublicHoliday } from '@/lib/holida
 import { updateDailyVisitorCount } from '@/app/actions/visitor-actions';
 import { getSystemConfig, updateSystemConfig, getSystemConfigsByPattern } from '@/app/actions/config-actions';
 import { BackupManager } from './backup-manager';
+import { PricingStrategyView } from './pricing-strategy-view';
 import { AiCfoChat } from './ai-cfo-chat';
 
 interface DashboardViewProps {
@@ -62,7 +63,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
     const router = useRouter();
     const role = session?.role || 'admin';
     const [isPending, startTransition] = useTransition();
-    const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2024' | 'ops2025' | 'ops2026' | 'visitor_stats' | 'reconciliation' | 'marketing'>(
+    const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'invoice' | 'ops2024' | 'ops2025' | 'ops2026' | 'visitor_stats' | 'reconciliation' | 'marketing' | 'pricing'>(
         role === 'ops' ? 'ops2026' : 'overview'
     );
     const [selectedYear, setSelectedYear] = useState<string>('2026');
@@ -2341,6 +2342,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     { id: 'reconciliation', label: `${RECON_YEAR}對賬中心`, icon: <DollarSign className="w-4 h-4 mr-2" />, roles: ['admin', 'fin'] },
                     { id: 'visitor_stats', label: '訪客統計', icon: <Users className="w-4 h-4 mr-2" />, roles: ['admin'] },
                     { id: 'marketing', label: '行銷中心', icon: <Megaphone className="w-4 h-4 mr-2" />, roles: ['admin', 'ops'] },
+                    { id: 'pricing', label: '定價策略', icon: <Target className="w-4 h-4 mr-2" />, roles: ['admin', 'fin', 'ops'] },
                 ].filter(tab => tab.roles.includes(role)).map((tab) => (
                     <button
                         key={tab.id}
@@ -2632,10 +2634,17 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                             .bg-red-50\\/30 { background-color: #fef2f2 !important; -webkit-print-color-adjust: exact; }
                             .text-red-500 { color: #ef4444 !important; }
                         }
-                    `}} />
+                {activeTab === 'pricing' && (
+                    <div className="space-y-6">
+                        <PricingStrategyView />
+                    </div>
+                )}
 
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 print-section">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 no-print">
+                {activeTab === 'reconciliation' && (
+                    <>
+                    <style dangerouslySetInnerHTML={{
+                        __html: `
+                                < div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 no-print" >
                                 <div>
                                     <h3 className="text-lg font-bold text-slate-800">{RECON_YEAR}對賬中心</h3>
                                     <p className="text-sm text-slate-500">僅針對 {RECON_YEAR} 年度，比對系統發票與平台交易數據 (依金額及時間自動匹配)</p>
@@ -2712,1518 +2721,1518 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                             </div>
 
                             {/* Print Header (Visible only when printing) */}
-                            <div className="hidden print:block mb-6 border-b-2 border-slate-800 pb-4">
-                                <h2 className="text-2xl font-black text-slate-900">對帳明細報表</h2>
-                                <div className="flex justify-between items-end mt-2">
-                                    <p className="text-slate-600 text-sm">
-                                        對帳區間：<span className="font-bold">{reconStartDate}</span> 至 <span className="font-bold">{reconEndDate}</span>
-                                    </p>
-                                    <p className="text-slate-400 text-xs">列印日期：{new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</p>
-                                </div>
-                            </div>
+            <div className="hidden print:block mb-6 border-b-2 border-slate-800 pb-4">
+                <h2 className="text-2xl font-black text-slate-900">對帳明細報表</h2>
+                <div className="flex justify-between items-end mt-2">
+                    <p className="text-slate-600 text-sm">
+                        對帳區間：<span className="font-bold">{reconStartDate}</span> 至 <span className="font-bold">{reconEndDate}</span>
+                    </p>
+                    <p className="text-slate-400 text-xs">列印日期：{new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</p>
+                </div>
+            </div>
 
-                            {isReconLoading ? (
-                                <div className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                                    <div className="p-4 bg-white rounded-full shadow-sm mb-4">
-                                        <Loader2 className="w-10 h-10 text-slate-300 animate-spin" />
-                                    </div>
-                                    <h4 className="text-slate-600 font-medium mb-1">載入平台清單中</h4>
-                                    <p className="text-slate-400 text-sm">正在讀取「{reconPaymentMethod}」的目前清單</p>
-                                </div>
-                            ) : (platformData.length === 0 && reconSystemRecords.length === 0) ? (
-                                <div className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                                    <div className="p-4 bg-white rounded-full shadow-sm mb-4">
-                                        <CreditCard className="w-10 h-10 text-slate-300" />
-                                    </div>
-                                    <h4 className="text-slate-600 font-medium mb-1">尚無可對帳資料</h4>
-                                    <p className="text-slate-400 text-sm mb-6">請確認期間與支付方式，或上傳平台交易報表進行比對</p>
-                                </div>
-                            ) : (
-                                <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                                    <table className="w-full text-sm text-left border-collapse">
-                                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-xs">
-                                            <tr>
-                                                <th className="px-4 py-3 border-r border-slate-200 bg-slate-100/50" colSpan={4}>系統發票紀錄 (左)</th>
-                                                <th className="px-4 py-3 text-center border-r border-slate-200 w-24">對帳狀態</th>
-                                                <th className="px-4 py-3 bg-slate-100/50" colSpan={3}>平台交易數據 (右)</th>
-                                            </tr>
-                                            <tr className="bg-slate-50/80 border-b border-slate-200">
-                                                <th className="px-4 py-2 font-medium">交易時間</th>
-                                                <th className="px-4 py-2 font-medium">發票號碼</th>
-                                                <th className="px-4 py-2 font-medium text-right">金額</th>
-                                                <th className="px-4 py-2 font-medium border-r border-slate-200">備註</th>
-                                                <th className="px-4 py-2 text-center border-r border-slate-200">-</th>
-                                                <th className="px-4 py-2 font-medium">交易時間</th>
-                                                <th className="px-4 py-2 font-medium">平台序號</th>
-                                                <th className="px-4 py-2 font-medium text-right">金額</th>
-                                                <th className="px-4 py-2 text-center w-10">-</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {reconciliationMatches.map((match, idx) => {
-                                                const isMatched = match.status === 'matched';
-                                                const isTopUp = match.status === 'topup_non_consume';
-                                                const isRefundSkipped = match.status === 'refund_skipped';
-                                                const sys = match.system;
-                                                const plat = match.platform;
+            {isReconLoading ? (
+                <div className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                    <div className="p-4 bg-white rounded-full shadow-sm mb-4">
+                        <Loader2 className="w-10 h-10 text-slate-300 animate-spin" />
+                    </div>
+                    <h4 className="text-slate-600 font-medium mb-1">載入平台清單中</h4>
+                    <p className="text-slate-400 text-sm">正在讀取「{reconPaymentMethod}」的目前清單</p>
+                </div>
+            ) : (platformData.length === 0 && reconSystemRecords.length === 0) ? (
+                <div className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                    <div className="p-4 bg-white rounded-full shadow-sm mb-4">
+                        <CreditCard className="w-10 h-10 text-slate-300" />
+                    </div>
+                    <h4 className="text-slate-600 font-medium mb-1">尚無可對帳資料</h4>
+                    <p className="text-slate-400 text-sm mb-6">請確認期間與支付方式，或上傳平台交易報表進行比對</p>
+                </div>
+            ) : (
+                <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table className="w-full text-sm text-left border-collapse">
+                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-xs">
+                            <tr>
+                                <th className="px-4 py-3 border-r border-slate-200 bg-slate-100/50" colSpan={4}>系統發票紀錄 (左)</th>
+                                <th className="px-4 py-3 text-center border-r border-slate-200 w-24">對帳狀態</th>
+                                <th className="px-4 py-3 bg-slate-100/50" colSpan={3}>平台交易數據 (右)</th>
+                            </tr>
+                            <tr className="bg-slate-50/80 border-b border-slate-200">
+                                <th className="px-4 py-2 font-medium">交易時間</th>
+                                <th className="px-4 py-2 font-medium">發票號碼</th>
+                                <th className="px-4 py-2 font-medium text-right">金額</th>
+                                <th className="px-4 py-2 font-medium border-r border-slate-200">備註</th>
+                                <th className="px-4 py-2 text-center border-r border-slate-200">-</th>
+                                <th className="px-4 py-2 font-medium">交易時間</th>
+                                <th className="px-4 py-2 font-medium">平台序號</th>
+                                <th className="px-4 py-2 font-medium text-right">金額</th>
+                                <th className="px-4 py-2 text-center w-10">-</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {reconciliationMatches.map((match, idx) => {
+                                const isMatched = match.status === 'matched';
+                                const isTopUp = match.status === 'topup_non_consume';
+                                const isRefundSkipped = match.status === 'refund_skipped';
+                                const sys = match.system;
+                                const plat = match.platform;
 
-                                                const isError = !isMatched && !isTopUp && !isRefundSkipped;
+                                const isError = !isMatched && !isTopUp && !isRefundSkipped;
 
-                                                return (
-                                                    <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${isTopUp ? 'bg-blue-50/40' : (isError ? 'bg-red-50/30' : '')}`}>
-                                                        {/* System Info */}
-                                                        <td className={`px-4 py-3 text-xs ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-500')}`}>
-                                                            {sys ? formatDateInTaipei(sys.date) : isTopUp ? '加值非消費' : '缺失記錄'}
-                                                        </td>
-                                                        <td className={`px-4 py-3 font-mono ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
-                                                            {sys?.invoiceNumber || (isTopUp ? '加值非消費' : '無發票')}
-                                                        </td>
-                                                        <td className={`px-4 py-3 text-right font-mono font-medium ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
-                                                            {sys ? `$${sys.amount.toLocaleString()}` : '-'}
-                                                        </td>
-                                                        <td className={`px-4 py-3 border-r border-slate-200 text-xs ${sys?.isSalesReturn ? (isError ? 'text-red-500 font-bold' : 'text-amber-600 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-400')}`}>
-                                                            {sys?.isSalesReturn ? '銷退' : (isTopUp ? '加值非消費' : '')}
-                                                        </td>
+                                return (
+                                    <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${isTopUp ? 'bg-blue-50/40' : (isError ? 'bg-red-50/30' : '')}`}>
+                                        {/* System Info */}
+                                        <td className={`px-4 py-3 text-xs ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-500')}`}>
+                                            {sys ? formatDateInTaipei(sys.date) : isTopUp ? '加值非消費' : '缺失記錄'}
+                                        </td>
+                                        <td className={`px-4 py-3 font-mono ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
+                                            {sys?.invoiceNumber || (isTopUp ? '加值非消費' : '無發票')}
+                                        </td>
+                                        <td className={`px-4 py-3 text-right font-mono font-medium ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
+                                            {sys ? `$${sys.amount.toLocaleString()}` : '-'}
+                                        </td>
+                                        <td className={`px-4 py-3 border-r border-slate-200 text-xs ${sys?.isSalesReturn ? (isError ? 'text-red-500 font-bold' : 'text-amber-600 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-400')}`}>
+                                            {sys?.isSalesReturn ? '銷退' : (isTopUp ? '加值非消費' : '')}
+                                        </td>
 
-                                                        {/* Status Icon */}
-                                                        <td className="px-4 py-3 text-center border-r border-slate-200">
-                                                            {isMatched ? (
-                                                                <div className="flex flex-col items-center">
-                                                                    <CheckCircle className="w-5 h-5 text-green-500" />
-                                                                    <span className="text-[10px] text-green-600 font-bold mt-1">已對齊</span>
-                                                                </div>
-                                                            ) : isTopUp ? (
-                                                                <div className="flex flex-col items-center">
-                                                                    <Zap className="w-5 h-5 text-blue-500" />
-                                                                    <span className="text-[10px] text-blue-600 font-bold mt-1">加值非消費</span>
-                                                                </div>
-                                                            ) : isRefundSkipped ? (
-                                                                <div className="flex flex-col items-center">
-                                                                    <CheckCircle className="w-5 h-5 text-amber-500" />
-                                                                    <span className="text-[10px] text-amber-600 font-bold mt-1">平台不計</span>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="flex flex-col items-center">
-                                                                    <AlertTriangle className="w-5 h-5 text-red-500" />
-                                                                    <span className="text-[10px] text-red-600 font-bold mt-1">未匹配</span>
-                                                                </div>
-                                                            )}
-                                                        </td>
-
-                                                        {/* Platform Info */}
-                                                        <td className={`px-4 py-3 text-xs ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-500')}`}>
-                                                            {plat ? formatDateInTaipei(plat.date) : (isRefundSkipped ? '-' : '缺失記錄')}
-                                                        </td>
-                                                        <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-600')}`} title={plat?.txId}>
-                                                            {plat?.txId || (isRefundSkipped ? '-' : '-')}
-                                                        </td>
-                                                        <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
-                                                            {plat ? `$${plat.amount.toLocaleString()}` : (isRefundSkipped ? '-' : '-')}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            {plat && (
-                                                                <button
-                                                                    onClick={() => setInspectedRow(plat.raw)}
-                                                                    className="p-1 hover:bg-slate-200 rounded-md transition-colors text-slate-400 hover:text-blue-600"
-                                                                    title="查看原始數據"
-                                                                >
-                                                                    <Info className="w-4 h-4" />
-                                                                </button>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-
-                            {platformData.length > 0 && (
-                                <div className="mt-6 flex items-center justify-between no-print">
-                                    <div className="flex items-center gap-3">
-                                        <button
-                                            onClick={() => window.print()}
-                                            className="flex items-center gap-2 px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-all shadow-lg active:scale-95"
-                                        >
-                                            <Printer className="w-4 h-4" />
-                                            <span>列印對賬狀態</span>
-                                        </button>
-                                        <button
-                                            onClick={handleCompleteReconciliation}
-                                            className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
-                                        >
-                                            <CheckCircle className="w-4 h-4" />
-                                            <span>完成對賬</span>
-                                        </button>
-                                    </div>
-
-                                    <button
-                                        onClick={async () => {
-                                            applyReconPlatformData([], true);
-                                            setIsMatching(false);
-                                            try {
-                                                await persistReconPlatformData(reconPaymentMethod, []);
-                                            } catch (e) {
-                                                console.error('Failed to clear platform data:', e);
-                                            }
-                                        }}
-                                        className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-red-500 font-medium transition-colors text-sm"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                        <span>清除目前比對資料</span>
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Raw Data Inspector Modal */}
-                            {inspectedRow && (
-                                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
-                                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                                <Info className="w-5 h-5 text-blue-500" />
-                                                原始數據檢查器 (Platform Row Data)
-                                            </h3>
-                                            <button
-                                                onClick={() => setInspectedRow(null)}
-                                                className="p-2 hover:bg-slate-200 rounded-full transition-colors"
-                                            >
-                                                <X className="w-5 h-5 text-slate-500" />
-                                            </button>
-                                        </div>
-                                        <div className="p-6 overflow-y-auto">
-                                            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                                                {Object.entries(inspectedRow).map(([key, val]) => (
-                                                    <div key={key} className="border-b border-slate-50 pb-2">
-                                                        <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">{key}</span>
-                                                        <span className="text-sm text-slate-700 font-mono break-all">
-                                                            {typeof val === 'number' && val > 10000000 ? val.toFixed(0) : String(val)}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-                                            <button
-                                                onClick={() => setInspectedRow(null)}
-                                                className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg"
-                                            >
-                                                關閉
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {reconRecordDetail && (
-                                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden">
-                                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                                            <div>
-                                                <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                                    <Info className="w-5 h-5 text-blue-500" />
-                                                    對賬記錄
-                                                </h3>
-                                                <p className="text-xs text-slate-500 mt-1">
-                                                    {reconRecordDetail.method} / {reconRecordDetail.month}
-                                                </p>
-                                            </div>
-                                            <button
-                                                onClick={() => setReconRecordDetail(null)}
-                                                className="p-2 hover:bg-slate-200 rounded-full transition-colors"
-                                            >
-                                                <X className="w-5 h-5 text-slate-500" />
-                                            </button>
-                                        </div>
-                                        <div className="p-6 overflow-y-auto space-y-4">
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                                    <div className="text-xs text-slate-500">對賬時間</div>
-                                                    <div className="font-semibold text-slate-700">{formatDateInTaipei(reconRecordDetail.reconciledAt)}</div>
+                                        {/* Status Icon */}
+                                        <td className="px-4 py-3 text-center border-r border-slate-200">
+                                            {isMatched ? (
+                                                <div className="flex flex-col items-center">
+                                                    <CheckCircle className="w-5 h-5 text-green-500" />
+                                                    <span className="text-[10px] text-green-600 font-bold mt-1">已對齊</span>
                                                 </div>
-                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                                    <div className="text-xs text-slate-500">對賬區間</div>
-                                                    <div className="font-semibold text-slate-700">{reconRecordDetail.rangeStart} ~ {reconRecordDetail.rangeEnd}</div>
+                                            ) : isTopUp ? (
+                                                <div className="flex flex-col items-center">
+                                                    <Zap className="w-5 h-5 text-blue-500" />
+                                                    <span className="text-[10px] text-blue-600 font-bold mt-1">加值非消費</span>
                                                 </div>
-                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                                    <div className="text-xs text-slate-500">付款方式</div>
-                                                    <div className="font-semibold text-slate-700">{reconRecordDetail.method}</div>
+                                            ) : isRefundSkipped ? (
+                                                <div className="flex flex-col items-center">
+                                                    <CheckCircle className="w-5 h-5 text-amber-500" />
+                                                    <span className="text-[10px] text-amber-600 font-bold mt-1">平台不計</span>
                                                 </div>
-                                            </div>
+                                            ) : (
+                                                <div className="flex flex-col items-center">
+                                                    <AlertTriangle className="w-5 h-5 text-red-500" />
+                                                    <span className="text-[10px] text-red-600 font-bold mt-1">未匹配</span>
+                                                </div>
+                                            )}
+                                        </td>
 
-                                            <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                                                <table className="w-full text-sm">
-                                                    <thead className="bg-slate-50 border-b border-slate-200">
-                                                        <tr>
-                                                            <th className="px-4 py-3 text-center border-r border-slate-200 w-24">對賬狀態</th>
-                                                            <th className="px-4 py-3 text-slate-600 font-bold">系統交易時間</th>
-                                                            <th className="px-4 py-3 text-slate-600 font-bold">訂單編號</th>
-                                                            <th className="px-4 py-3 text-right text-slate-600 font-bold">系統金額</th>
-                                                            <th className="px-4 py-3 text-slate-600 font-bold">發票號碼</th>
-                                                            <th className="px-4 py-3 text-slate-600 font-bold">平台交易時間</th>
-                                                            <th className="px-4 py-3 text-slate-600 font-bold">平台序號</th>
-                                                            <th className="px-4 py-3 text-right text-slate-600 font-bold">平台金額</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-100">
-                                                        {reconRecordDetail.matches?.map((match: any, idx: number) => {
-                                                            const sys = match.system;
-                                                            const plat = match.platform;
-                                                            const status = match.status;
-                                                            return (
-                                                                <tr key={`${match.status}-${idx}`} className="hover:bg-slate-50">
-                                                                    <td className="px-4 py-3 text-center border-r border-slate-200">
-                                                                        {status === 'matched' ? (
-                                                                            <div className="flex flex-col items-center">
-                                                                                <CheckCircle className="w-5 h-5 text-emerald-500" />
-                                                                                <span className="text-[10px] text-emerald-600 font-bold mt-1">已匹配</span>
-                                                                            </div>
-                                                                        ) : status === 'refund_skipped' ? (
-                                                                            <div className="flex flex-col items-center">
-                                                                                <CheckCircle className="w-5 h-5 text-amber-500" />
-                                                                                <span className="text-[10px] text-amber-600 font-bold mt-1">平台不計</span>
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="flex flex-col items-center">
-                                                                                <AlertTriangle className="w-5 h-5 text-red-500" />
-                                                                                <span className="text-[10px] text-red-600 font-bold mt-1">未匹配</span>
-                                                                            </div>
-                                                                        )}
-                                                                    </td>
-                                                                    <td className={`px-4 py-3 text-xs ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
-                                                                        {sys ? formatDateInTaipei(sys.date) : '缺失記錄'}
-                                                                    </td>
-                                                                    <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
-                                                                        {sys?.id || '-'}
-                                                                    </td>
-                                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${!sys ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
-                                                                        {sys ? `$${Number(sys.amount).toLocaleString()}` : '-'}
-                                                                    </td>
-                                                                    <td className={`px-4 py-3 font-mono ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
-                                                                        {sys?.invoiceNumber || '無發票'}
-                                                                    </td>
-                                                                    <td className={`px-4 py-3 text-xs ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-500'}`}>
-                                                                        {plat ? formatDateInTaipei(plat.date) : (status === 'refund_skipped' ? '-' : '缺失記錄')}
-                                                                    </td>
-                                                                    <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-600'}`}>
-                                                                        {plat?.txId || (status === 'refund_skipped' ? '-' : '-')}
-                                                                    </td>
-                                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-700'}`}>
-                                                                        {plat ? `$${Number(plat.amount).toLocaleString()}` : (status === 'refund_skipped' ? '-' : '-')}
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-                                            <button
-                                                onClick={() => setReconRecordDetail(null)}
-                                                className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg"
-                                            >
-                                                關閉
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                                        {/* Platform Info */}
+                                        <td className={`px-4 py-3 text-xs ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-500')}`}>
+                                            {plat ? formatDateInTaipei(plat.date) : (isRefundSkipped ? '-' : '缺失記錄')}
+                                        </td>
+                                        <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-600')}`} title={plat?.txId}>
+                                            {plat?.txId || (isRefundSkipped ? '-' : '-')}
+                                        </td>
+                                        <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
+                                            {plat ? `$${plat.amount.toLocaleString()}` : (isRefundSkipped ? '-' : '-')}
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            {plat && (
+                                                <button
+                                                    onClick={() => setInspectedRow(plat.raw)}
+                                                    className="p-1 hover:bg-slate-200 rounded-md transition-colors text-slate-400 hover:text-blue-600"
+                                                    title="查看原始數據"
+                                                >
+                                                    <Info className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {platformData.length > 0 && (
+                <div className="mt-6 flex items-center justify-between no-print">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => window.print()}
+                            className="flex items-center gap-2 px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-all shadow-lg active:scale-95"
+                        >
+                            <Printer className="w-4 h-4" />
+                            <span>列印對賬狀態</span>
+                        </button>
+                        <button
+                            onClick={handleCompleteReconciliation}
+                            className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
+                        >
+                            <CheckCircle className="w-4 h-4" />
+                            <span>完成對賬</span>
+                        </button>
                     </div>
-                )
-            }
 
-            {/* Growth Tab */}
-            {
-                activeTab === 'growth' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                                <div>
-                                    <h3 className="text-lg font-bold text-slate-800">營收成長分析 (MoM / YoY)</h3>
-                                    <p className="text-sm text-slate-500">比較當前月份與上月、去年同期的營收變化</p>
-                                </div>
-                                <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                    <span className="text-sm font-semibold text-slate-700">2026 年度目標營業額:</span>
-                                    <div className="flex items-center gap-2 relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
-                                        <input
-                                            type="text"
-                                            value={target2026.toLocaleString()}
-                                            onChange={(e) => {
-                                                const rawValue = e.target.value.replace(/,/g, '');
-                                                const numValue = parseInt(rawValue) || 0;
-                                                setTarget2026(Math.max(0, numValue));
-                                            }}
-                                            className="pl-6 pr-3 py-1.5 w-32 md:w-40 border border-slate-300 rounded-lg text-right font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                        />
-                                    </div>
-                                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${isSavingTarget
-                                        ? 'text-blue-600 bg-blue-50 animate-pulse'
-                                        : 'text-slate-400 bg-slate-100'
-                                        }`}>
-                                        {isSavingTarget ? (
-                                            <>
-                                                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" />
-                                                自動儲存中...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <CheckCircle className="w-3 h-3 text-green-500" />
-                                                已自動儲存
-                                            </>
-                                        )}
-                                    </div>
-                                    <span className="text-xs text-slate-500 hidden md:inline">(依 2025 比例自動分配)</span>
-                                </div>
-                            </div>
+                    <button
+                        onClick={async () => {
+                            applyReconPlatformData([], true);
+                            setIsMatching(false);
+                            try {
+                                await persistReconPlatformData(reconPaymentMethod, []);
+                            } catch (e) {
+                                console.error('Failed to clear platform data:', e);
+                            }
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-red-500 font-medium transition-colors text-sm"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                        <span>清除目前比對資料</span>
+                    </button>
+                </div>
+            )}
 
-                            {/* Pivot Table Style Growth Report */}
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-4 py-3">月份</th>
-                                            <th className="px-4 py-3 text-right">2024年</th>
-                                            <th className="px-4 py-3 text-right">2025年</th>
-                                            <th className="px-4 py-3 text-right bg-blue-50/50 text-blue-800 border-l border-blue-100">2026 目標</th>
-                                            <th className="px-4 py-3 text-right">2026年</th>
-                                            <th className="px-4 py-3 text-right">YoY (26 vs 25)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {yearPivotData.map((row) => (
-                                            <tr key={row.month} className="hover:bg-slate-50/50">
-                                                <td className="px-4 py-3 font-medium text-slate-700">{row.month}月</td>
-                                                <td className="px-4 py-3 text-right text-slate-600">
-                                                    {row['2024'] ? `$${new Intl.NumberFormat('en-US').format(row['2024'])}` : '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-slate-600">
-                                                    {row['2025'] ? `$${new Intl.NumberFormat('en-US').format(row['2025'])}` : '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-mono text-blue-600 bg-blue-50/30 border-l border-blue-100">
-                                                    ${new Intl.NumberFormat('en-US').format(Math.round(row.target2026))}
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-bold text-slate-800">
-                                                    {row['2026'] ? `$${new Intl.NumberFormat('en-US').format(row['2026'])}` : '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    {row.yoy === null ? '-' : (
-                                                        <span className={`px-2 py-1 rounded text-xs font-bold ${row.yoy > 0 ? 'bg-green-100 text-green-700' :
-                                                            row.yoy < 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
-                                                            }`}>
-                                                            {row.yoy > 0 ? '+' : ''}{row.yoy.toFixed(1)}%
-                                                        </span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-200">
-                                        <tr>
-                                            <td className="px-4 py-3 text-slate-800">年度總計</td>
-                                            <td className="px-4 py-3 text-right text-slate-800">
-                                                ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r['2024'] || 0), 0))}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-slate-800">
-                                                ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r['2025'] || 0), 0))}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-blue-800 bg-blue-50/50 border-l border-blue-100">
-                                                ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r.target2026 || 0), 0))}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-slate-900 border-l border-r border-slate-200 bg-slate-200/50">
-                                                ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r['2026'] || 0), 0))}
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                {(() => {
-                                                    const total2025 = yearPivotData.reduce((sum, r) => sum + (r['2025'] || 0), 0);
-                                                    const total2026 = yearPivotData.reduce((sum, r) => sum + (r['2026'] || 0), 0);
-                                                    if (total2025 === 0) return '-';
-                                                    const yoy = ((total2026 - total2025) / total2025) * 100;
-                                                    return (
-                                                        <span className={`px-2 py-1 rounded text-xs font-bold ${yoy > 0 ? 'bg-green-100 text-green-800' :
-                                                            yoy < 0 ? 'bg-red-100 text-red-800' : 'bg-slate-200 text-slate-700'
-                                                            }`}>
-                                                            {yoy > 0 ? '+' : ''}{yoy.toFixed(1)}%
-                                                        </span>
-                                                    );
-                                                })()}
-                                            </td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Invoice Tab */}
-            {
-                activeTab === 'invoice' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            {/* Header & Sub-tabs */}
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                                <div>
-                                    <h3 className="text-lg font-bold text-slate-800">
-                                        {invoiceSubTab === 'list' ? '發票交易明細' : '異常偵測 (斷號分析)'}
-                                    </h3>
-                                    <p className="text-sm text-slate-500">
-                                        {invoiceSubTab === 'list'
-                                            ? '可透過日期區間與支付方式篩選特定交易'
-                                            : '自動檢測發票號碼連續性 (忽略支付方式篩選)'}
-                                    </p>
-                                </div>
-
-                                <div className="flex bg-slate-100 p-1 rounded-lg self-start md:self-auto">
-                                    <button
-                                        onClick={() => setInvoiceSubTab('list')}
-                                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${invoiceSubTab === 'list'
-                                            ? 'bg-white text-blue-600 shadow-sm'
-                                            : 'text-slate-500 hover:text-slate-700'}`}
-                                    >
-                                        明細列表
-                                    </button>
-                                    <button
-                                        onClick={() => setInvoiceSubTab('anomaly')}
-                                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${invoiceSubTab === 'anomaly'
-                                            ? 'bg-white text-red-600 shadow-sm'
-                                            : 'text-slate-500 hover:text-slate-700'}`}
-                                    >
-                                        異常偵測
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Filters Toolbar */}
-                            <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-slate-50 rounded-lg">
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => {
-                                            const now = new Date();
-                                            const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                                            const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                            setInvoiceStartDate(formatDate(firstDayThisMonth));
-                                            setInvoiceEndDate(formatDate(now));
-                                        }}
-                                        className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors"
-                                    >
-                                        本月
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            const now = new Date();
-                                            const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                                            const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-                                            const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                            setInvoiceStartDate(formatDate(firstDayLastMonth));
-                                            setInvoiceEndDate(formatDate(lastDayLastMonth));
-                                        }}
-                                        className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors"
-                                    >
-                                        上個月
-                                    </button>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-semibold text-slate-500 uppercase">日期範圍</span>
-                                    <input
-                                        type="date"
-                                        value={invoiceStartDate}
-                                        onChange={(e) => setInvoiceStartDate(e.target.value)}
-                                        className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500"
-                                    />
-                                    <span className="text-slate-400">~</span>
-                                    <input
-                                        type="date"
-                                        value={invoiceEndDate}
-                                        onChange={(e) => setInvoiceEndDate(e.target.value)}
-                                        className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500"
-                                    />
-                                </div>
-
-                                {invoiceSubTab === 'list' && (
-                                    <div className="flex flex-wrap items-center gap-3 ml-auto md:ml-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-500 uppercase">支付方式</span>
-                                            <select
-                                                value={invoicePaymentFilter}
-                                                onChange={(e) => setInvoicePaymentFilter(e.target.value)}
-                                                className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500 min-w-[120px]"
-                                            >
-                                                <option value="All">全部</option>
-                                                {paymentMethodOptions.map(p => (
-                                                    <option key={p} value={p}>{p}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-500 uppercase">交易類型</span>
-                                            <select
-                                                value={invoiceTransactionTypeFilter}
-                                                onChange={(e) => setInvoiceTransactionTypeFilter(e.target.value)}
-                                                className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500 min-w-[120px]"
-                                            >
-                                                <option value="All">全部</option>
-                                                {transactionTypeOptions.map(t => (
-                                                    <option key={t} value={t}>{t}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-500 uppercase">發票開立類型</span>
-                                            <select
-                                                value={invoiceIssueTypeFilter}
-                                                onChange={(e) => setInvoiceIssueTypeFilter(e.target.value)}
-                                                className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500 min-w-[140px]"
-                                            >
-                                                <option value="All">全部</option>
-                                                <option value="__EMPTY__">空白</option>
-                                                {invoiceIssueTypeOptions.map(t => (
-                                                    <option key={t} value={t}>{t}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {(() => {
-                                    const now = new Date();
-                                    const defaultStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-                                    const defaultEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                                    const isDirty = invoiceStartDate !== defaultStart || invoiceEndDate !== defaultEnd ||
-                                        invoicePaymentFilter !== 'All' || invoiceTransactionTypeFilter !== 'All' || invoiceIssueTypeFilter !== 'All';
-                                    if (!isDirty) return null;
-                                    return (
-                                        <button
-                                            onClick={() => {
-                                                const resetNow = new Date();
-                                                const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                                const firstDay = new Date(resetNow.getFullYear(), resetNow.getMonth(), 1);
-                                                setInvoiceStartDate(formatDate(firstDay));
-                                                setInvoiceEndDate(formatDate(resetNow));
-                                                setInvoicePaymentFilter('All');
-                                                setInvoiceTransactionTypeFilter('All');
-                                                setInvoiceIssueTypeFilter('All');
-                                            }}
-                                            className="ml-auto text-xs text-blue-600 hover:text-blue-800 underline px-2"
-                                        >
-                                            清除篩選
-                                        </button>
-                                    );
-                                })()}
-                            </div>
-
-                            {/* Content Area */}
-                            {invoiceSubTab === 'list' ? (
-                                <div className="space-y-4">
-                                    <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
-                                                <tr>
-                                                    <th className="px-4 py-3">交易狀態</th>
-                                                    <th className="px-4 py-3 text-right">筆數</th>
-                                                    <th className="px-4 py-3 text-right">估算金額</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {invoiceStatusSummary.rows.length === 0 ? (
-                                                    <tr>
-                                                        <td colSpan={3} className="px-4 py-6 text-center text-slate-500">沒有符合條件的交易</td>
-                                                    </tr>
-                                                ) : (
-                                                    <>
-                                                        {invoiceStatusSummary.rows.map(row => (
-                                                            <tr key={row.status} className="hover:bg-slate-50">
-                                                                <td className="px-4 py-3 text-slate-700">{row.status}</td>
-                                                                <td className="px-4 py-3 text-right font-mono text-slate-700">{row.count.toLocaleString()}</td>
-                                                                <td className="px-4 py-3 text-right font-mono text-slate-700">
-                                                                    ${Math.round(row.amount).toLocaleString()}
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                        <tr className="bg-slate-50 font-bold">
-                                                            <td className="px-4 py-3 text-slate-800">總計</td>
-                                                            <td className="px-4 py-3 text-right font-mono text-slate-800">{invoiceStatusSummary.total.count.toLocaleString()}</td>
-                                                            <td className="px-4 py-3 text-right font-mono text-slate-800">
-                                                                ${Math.round(invoiceStatusSummary.total.amount).toLocaleString()}
-                                                            </td>
-                                                        </tr>
-                                                    </>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <div className="text-right text-xs text-slate-500">
-                                        共 {invoiceTabData.length} 筆資料
-                                    </div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                                <tr>
-                                                    <th className="px-4 py-3">訂單編號</th>
-                                                    <th className="px-4 py-3">發票號碼</th>
-                                                    <th className="px-4 py-3">發票開立類型</th>
-                                                    <th className="px-4 py-3">交易時間</th>
-                                                    <th className="px-4 py-3 text-right">發票金額</th>
-                                                    <th className="px-4 py-3">支付方式</th>
-                                                    <th className="px-4 py-3">備註</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {invoiceTabData.length === 0 ? (
-                                                    <tr>
-                                                        <td colSpan={7} className="p-8 text-center text-slate-500">沒有符合條件的發票資料</td>
-                                                    </tr>
-                                                ) : (
-                                                    <InvoiceTablePagination data={invoiceTabData} refundSet={refundSet} />
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            ) : (
-                                // Anomaly Tab Content
-                                <div className="space-y-4">
-                                    {invoiceAnomalyData.length === 0 ? (
-                                        <div className="p-12 text-center text-slate-500 flex flex-col items-center">
-                                            <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
-                                            <p className="text-lg">目前日期範圍內未發現異常斷號</p>
-                                        </div>
-                                    ) : (
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-sm text-left">
-                                                <thead className="bg-red-50 text-red-800 border-b border-red-100">
-                                                    <tr>
-                                                        <th className="p-4">年份-月份</th>
-                                                        <th className="p-4">異常類型</th>
-                                                        <th className="p-4">異常描述</th>
-                                                        <th className="p-4">涉及號碼區間</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100">
-                                                    {invoiceAnomalyData.map((issue, idx) => (
-                                                        <tr key={idx} className="hover:bg-red-50/30">
-                                                            <td className="p-4 font-medium">{issue.ym}</td>
-                                                            <td className="p-4">
-                                                                <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">{issue.type}</span>
-                                                            </td>
-                                                            <td className="p-4 text-slate-700">{issue.desc}</td>
-                                                            <td className="p-4 font-mono text-xs text-slate-500">{issue.invoices.join(', ')}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* 2024 Ops Tab */}
-            {
-                activeTab === 'ops2024' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <AttractionManager
-                            attractions={attractions}
-                            setAttractions={setAttractions}
-                            updateSystemConfig={updateSystemConfig}
-                        />
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-4">
-                                    <h3 className="text-lg font-bold text-slate-800">2024年 每日營收報表</h3>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => handleSaveVisitorStats()}
-                                        disabled={savingVisitors}
-                                        className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
-                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
-                                            }`}
-                                    >
-                                        <Save className="w-4 h-4" />
-                                        <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
-                                    </button>
-                                    <select
-                                        className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-                                        value={ops2024Month}
-                                        onChange={(e) => setOps2024Month(parseInt(e.target.value))}
-                                    >
-                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                                            <option key={m} value={m}>{m} 月</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* KPI Metrics Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                    <h4 className="text-sm font-semibold text-blue-700 mb-1">本月實際業績</h4>
-                                    <div className="text-2xl font-bold text-blue-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2024KPI.actual))}</div>
-                                </div>
-                                <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
-                                    <h4 className="text-sm font-semibold text-pink-700 mb-1">當月體驗人次</h4>
-                                    <div className="text-2xl font-bold text-pink-900">{new Intl.NumberFormat('en-US').format(ops2024KPI.totalVisitors)} 人</div>
-                                </div>
-                                <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
-                                    <h4 className="text-sm font-semibold text-cyan-700 mb-1">人均消費 (ARPU)</h4>
-                                    <div className="text-2xl font-bold text-cyan-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2024KPI.arpu))}</div>
-                                </div>
-                                <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
-                                    <h4 className="text-sm font-semibold text-amber-700 mb-1">達標率</h4>
-                                    <div className="text-2xl font-bold text-amber-900">{ops2024KPI.rate.toFixed(1)}%</div>
-                                </div>
-                            </div>
-
-                            {/* Success/Failure Analysis Section */}
-                            <div className="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
-                                <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    <Info className="w-5 h-5 text-blue-600" />
-                                    2024年 {ops2024Month}月 運營分析
-                                </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-3">
-                                        <div className="flex items-start gap-3">
-                                            <div className="mt-1 p-1 bg-green-100 rounded-full"><CheckCircle className="w-4 h-4 text-green-600" /></div>
-                                            <div>
-                                                <p className="font-bold text-slate-700 text-sm">表現亮點</p>
-                                                <p className="text-xs text-slate-500 leading-relaxed">
-                                                    {ops2024KPI.rate >= 100 ? '本月成功達標，主要受益於假期人流。' : '本月營收主要集中在週末與特定活動期間。'}
-                                                    ARPU 表現為 ${Math.round(ops2024KPI.arpu)}，反映出穩定的客單價。
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <div className="flex items-start gap-3">
-                                            <div className="mt-1 p-1 bg-red-100 rounded-full"><AlertTriangle className="w-4 h-4 text-red-600" /></div>
-                                            <div>
-                                                <p className="font-bold text-slate-700 text-sm">優化空間</p>
-                                                <p className="text-xs text-slate-500 leading-relaxed">
-                                                    {ops2024KPI.rate < 100 ? `達成率僅 ${ops2024KPI.rate.toFixed(1)}%，需檢討平日促銷方案。` : '建議在非尖峰時段進一步提升轉換率。'}
-                                                    觀察到週一休園效應對週二營收的潛發影響。
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <AttractionRankingCard
-                                year={2024}
-                                month={ops2024Month}
-                                granularData={granularData}
-                                attractions={attractions}
-                            />
-
-                            <DailyRevenueVisitorsChart
-                                title={`2024年 ${ops2024Month}月 每日營收及體驗人次圖`}
-                                data={ops2024Data}
-                            />
-
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-4 py-3">日期</th>
-                                            <th className="px-4 py-3">星期</th>
-                                            <th className="px-4 py-3 text-right">票務收入</th>
-                                            <th className="px-4 py-3 text-right">包場收入</th>
-                                            <th className="px-4 py-3 text-right">當日收入</th>
-                                            <th className="px-4 py-3 text-right text-slate-500">發票筆數</th>
-                                            <th className="px-4 py-3 text-right text-amber-600">平均交易價</th>
-                                            <th className="px-4 py-3 text-right">體驗人次</th>
-                                            <th className="px-4 py-3 text-right">包場人次</th>
-                                            <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
-                                            <th className="px-4 py-3">備註</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {ops2024Data.map((row) => (
-                                            <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
-                                                <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
-                                                <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                                                    {row.weekDay}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-slate-600 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-purple-600 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.revenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-slate-500 font-mono">
-                                                    {row.txCount > 0 ? row.txCount : '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-amber-600 font-mono">
-                                                    {row.atv > 0 ? `$${new Intl.NumberFormat('en-US').format(Math.round(row.atv))}` : '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <span className="font-bold text-blue-600">{row.visitorCount}</span>
-                                                        <button
-                                                            onClick={() => setEditingGranularDate(row.dateStr)}
-                                                            className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
-                                                            title="點擊編輯各項目明細"
-                                                        >
-                                                            <Edit3 className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
-                                                <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
-                                                    ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <input
-                                                        type="text"
-                                                        value={row.remark}
-                                                        onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
-                                                        placeholder="..."
-                                                        className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-500"
-                                                    />
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* 2025 Ops Tab */}
-            {
-                activeTab === 'ops2025' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <AttractionManager
-                            attractions={attractions}
-                            setAttractions={setAttractions}
-                            updateSystemConfig={updateSystemConfig}
-                        />
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-4">
-                                    <h3 className="text-lg font-bold text-slate-800">2025年 每日營收報表</h3>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => handleSaveVisitorStats()}
-                                        disabled={savingVisitors}
-                                        className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
-                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
-                                            }`}
-                                    >
-                                        <Save className="w-4 h-4" />
-                                        <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
-                                    </button>
-                                    <select
-                                        className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-                                        value={ops2025Month}
-                                        onChange={(e) => setOps2025Month(parseInt(e.target.value))}
-                                    >
-                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                                            <option key={m} value={m}>{m} 月</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* KPI Metrics Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                    <h4 className="text-sm font-semibold text-blue-700 mb-1">本月實際業績</h4>
-                                    <div className="text-2xl font-bold text-blue-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2025KPI.actual))}</div>
-                                </div>
-                                <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
-                                    <h4 className="text-sm font-semibold text-pink-700 mb-1">當月體驗人次</h4>
-                                    <div className="text-2xl font-bold text-pink-900">{new Intl.NumberFormat('en-US').format(ops2025KPI.totalVisitors)} 人</div>
-                                </div>
-                                <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
-                                    <h4 className="text-sm font-semibold text-cyan-700 mb-1">人均消費 (ARPU)</h4>
-                                    <div className="text-2xl font-bold text-cyan-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2025KPI.arpu))}</div>
-                                </div>
-                                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                                    <h4 className="text-sm font-semibold text-emerald-700 mb-1">達成率</h4>
-                                    <div className="text-2xl font-bold text-emerald-900">{ops2025KPI.rate.toFixed(1)}%</div>
-                                </div>
-                            </div>
-
-                            <AttractionRankingCard
-                                year={2025}
-                                month={ops2025Month}
-                                granularData={granularData}
-                                attractions={attractions}
-                            />
-
-                            <DailyRevenueVisitorsChart
-                                title={`2025年 ${ops2025Month}月 每日營收及體驗人次圖`}
-                                data={ops2025Data}
-                            />
-
-                            {/* Success/Failure Analysis Section */}
-                            <div className="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
-                                <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    <Info className="w-5 h-5 text-blue-600" />
-                                    2025年 {ops2025Month}月 運營分析
-                                </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-3">
-                                        <div className="flex items-start gap-3">
-                                            <div className="mt-1 p-1 bg-green-100 rounded-full"><CheckCircle className="w-4 h-4 text-green-600" /></div>
-                                            <div>
-                                                <p className="font-bold text-slate-700 text-sm">表現亮點</p>
-                                                <p className="text-xs text-slate-500 leading-relaxed">
-                                                    {ops2025KPI.rate >= 100 ? '本月份展現強勁增長，達成率極高。' : 'ARPU 貢獻穩定，維持在市場平均水準。'}
-                                                    體驗人次穩定突破 {new Intl.NumberFormat('en-US').format(ops2025KPI.totalVisitors)}。
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <div className="flex items-start gap-3">
-                                            <div className="mt-1 p-1 bg-red-100 rounded-full"><AlertTriangle className="w-4 h-4 text-red-600" /></div>
-                                            <div>
-                                                <p className="font-bold text-slate-700 text-sm">優化空間</p>
-                                                <p className="text-xs text-slate-500 leading-relaxed">
-                                                    {ops2025KPI.rate < 100 ? '部分平日時段業績未如預期，可加強校園折扣方案。' : '達標後應思考如何優化服務流程以應對高人流。'}
-                                                    天氣因素對營收波動影響顯著。
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-4 py-3">日期</th>
-                                            <th className="px-4 py-3">星期</th>
-                                            <th className="px-4 py-3 text-right">票務收入</th>
-                                            <th className="px-4 py-3 text-right">包場收入</th>
-                                            <th className="px-4 py-3 text-right">當日收入</th>
-                                            <th className="px-4 py-3 text-right text-slate-500">發票筆數</th>
-                                            <th className="px-4 py-3 text-right text-amber-600">平均交易價</th>
-                                            <th className="px-4 py-3 text-right">體驗人次</th>
-                                            <th className="px-4 py-3 text-right">包場人次</th>
-                                            <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
-                                            <th className="px-4 py-3">備註</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {ops2025Data.map((row) => (
-                                            <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
-                                                <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
-                                                <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                                                    {row.weekDay}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-slate-600 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-purple-600 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.revenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-slate-500 font-mono">
-                                                    {row.txCount > 0 ? row.txCount : '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-amber-600 font-mono">
-                                                    {row.atv > 0 ? `$${new Intl.NumberFormat('en-US').format(Math.round(row.atv))}` : '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <span className="font-bold text-blue-600">{row.visitorCount}</span>
-                                                        <button
-                                                            onClick={() => setEditingGranularDate(row.dateStr)}
-                                                            className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
-                                                            title="點擊編輯各項目明細"
-                                                        >
-                                                            <Edit3 className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
-                                                <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
-                                                    ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <input
-                                                        type="text"
-                                                        value={row.remark}
-                                                        onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
-                                                        placeholder="..."
-                                                        className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-500"
-                                                    />
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* 2026 Ops Tab */}
-            {
-                activeTab === 'ops2026' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <AttractionManager
-                            attractions={attractions}
-                            setAttractions={setAttractions}
-                            updateSystemConfig={updateSystemConfig}
-                        />
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-4">
-                                    <h3 className="text-lg font-bold text-slate-800">2026年 每日營收報表</h3>
-                                    {role !== 'ops' && (
-                                        <span className="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded">唯讀模式 (唯 Ops 可存儲)</span>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => handleSaveVisitorStats()}
-                                        disabled={savingVisitors}
-                                        className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
-                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
-                                            }`}
-                                    >
-                                        <Save className="w-4 h-4" />
-                                        <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
-                                    </button>
-                                    <select
-                                        className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-                                        value={ops2026Month}
-                                        onChange={(e) => setOps2026Month(parseInt(e.target.value))}
-                                    >
-                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                                            <option key={m} value={m}>{m} 月</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* KPI Metrics Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 mb-8">
-                                {/* Card 1: Monthly Target */}
-                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-sm font-semibold text-blue-700">業務目標 ({ops2026Month}月)</h4>
-                                        <TrendingUp className="w-4 h-4 text-blue-500" />
-                                    </div>
-                                    <div className="text-2xl font-bold text-blue-900">
-                                        ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.target))}
-                                    </div>
-                                    <div className="text-xs text-blue-600 mt-1">
-                                        依年度目標佔比分配
-                                    </div>
-                                </div>
-
-                                {/* Card 2: Daily Benchmark */}
-                                <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-sm font-semibold text-purple-700">每日基準業績</h4>
-                                        <Calendar className="w-4 h-4 text-purple-500" />
-                                    </div>
-                                    <div className="text-2xl font-bold text-purple-900">
-                                        ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.benchmark))}
-                                    </div>
-                                    <div className="text-xs text-purple-600 mt-1">
-                                        {ops2026KPI.workingDays} 個工作天 (排除週一)
-                                    </div>
-                                </div>
-
-                                {/* Card 3: Actual Revenue */}
-                                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-sm font-semibold text-emerald-700">本月實際業績</h4>
-                                        <DollarSign className="w-4 h-4 text-emerald-500" />
-                                    </div>
-                                    <div className="text-2xl font-bold text-emerald-900">
-                                        ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.actual))}
-                                    </div>
-                                    <div className="text-xs text-emerald-600 mt-1">
-                                        {ops2026Month}月 營收累計
-                                    </div>
-                                </div>
-
-                                {/* Card 4: Achievement Rate */}
-                                <div className={`p-4 rounded-xl border ${ops2026KPI.rate >= 100 ? 'bg-orange-50 border-orange-100' : 'bg-slate-50 border-slate-200'
-                                    }`}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className={`text-sm font-semibold ${ops2026KPI.rate >= 100 ? 'text-orange-700' : 'text-slate-600'
-                                            }`}>達成率</h4>
-                                        <CheckCircle className={`w-4 h-4 ${ops2026KPI.rate >= 100 ? 'text-orange-500' : 'text-slate-400'
-                                            }`} />
-                                    </div>
-                                    <div className={`text-2xl font-bold ${ops2026KPI.rate >= 100 ? 'text-orange-800' : 'text-slate-800'
-                                        }`}>
-                                        {ops2026KPI.rate.toFixed(1)}%
-                                    </div>
-                                    <div className={`text-xs mt-1 ${ops2026KPI.rate >= 100 ? 'text-orange-600' : 'text-slate-500'
-                                        }`}>
-                                        {ops2026KPI.rate >= 100 ? '已達標' : `還差 ${(100 - ops2026KPI.rate).toFixed(1)}%`}
-                                    </div>
-                                </div>
-
-                                {/* Card 5: Monthly Visitors */}
-                                <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-sm font-semibold text-pink-700">當月體驗人次</h4>
-                                        <Users className="w-4 h-4 text-pink-500" />
-                                    </div>
-                                    <div className="text-2xl font-bold text-pink-900">
-                                        {new Intl.NumberFormat('en-US').format(ops2026KPI.totalVisitors)}
-                                    </div>
-                                    <div className="text-xs text-pink-600 mt-1">
-                                        人
-                                    </div>
-                                </div>
-
-                                {/* Card 6: ARPU */}
-                                <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-sm font-semibold text-cyan-700">人均消費 (ARPU)</h4>
-                                        <TrendingUp className="w-4 h-4 text-cyan-500" />
-                                    </div>
-                                    <div className="text-2xl font-bold text-cyan-900">
-                                        ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.arpu))}
-                                    </div>
-                                    <div className="text-xs text-cyan-600 mt-1">
-                                        平均每人貢獻
-                                    </div>
-                                </div>
-                            </div>
-
-                            <AttractionRankingCard
-                                year={2026}
-                                month={ops2026Month}
-                                granularData={granularData}
-                                attractions={attractions}
-                            />
-
-                            <DailyRevenueVisitorsChart
-                                title={`2026年 ${ops2026Month}月 每日營收及體驗人次圖`}
-                                data={ops2026Data}
-                            />
-
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-4 py-3">日期</th>
-                                            <th className="px-4 py-3">星期</th>
-                                            <th className="px-4 py-3 text-right">票務收入</th>
-                                            <th className="px-4 py-3 text-right">包場收入</th>
-                                            <th className="px-4 py-3 text-right">當日收入</th>
-                                            <th className="px-4 py-3 text-right text-slate-500">發票筆數</th>
-                                            <th className="px-4 py-3 text-right text-amber-600">平均交易價</th>
-                                            <th className="px-4 py-3 text-right">體驗人次</th>
-                                            <th className="px-4 py-3 text-right">包場人次</th>
-                                            <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
-                                            <th className="px-4 py-3">備註</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {ops2026Data.map((row) => (
-                                            <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
-                                                <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
-                                                <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                                                    {row.weekDay}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-slate-600 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-purple-600 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
-                                                    ${new Intl.NumberFormat('en-US').format(row.revenue)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-slate-500 font-mono">
-                                                    {row.txCount > 0 ? row.txCount : '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-amber-600 font-mono">
-                                                    {row.atv > 0 ? `$${new Intl.NumberFormat('en-US').format(Math.round(row.atv))}` : '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <span className="font-bold text-blue-600">{row.visitorCount}</span>
-                                                        <button
-                                                            onClick={() => setEditingGranularDate(row.dateStr)}
-                                                            className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
-                                                            title="點擊編輯各項目明細"
-                                                        >
-                                                            <Edit3 className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
-                                                <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
-                                                    ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <input
-                                                        type="text"
-                                                        value={row.remark}
-                                                        onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
-                                                        placeholder="..."
-                                                        className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-700 transition-colors placeholder:text-slate-200"
-                                                    />
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Visitor Statistics Tab */}
-            {
-                activeTab === 'visitor_stats' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                <Users className="w-5 h-5 text-blue-600" />
-                                兒童新樂園入園人次統計
+            {/* Raw Data Inspector Modal */}
+            {inspectedRow && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                <Info className="w-5 h-5 text-blue-500" />
+                                原始數據檢查器 (Platform Row Data)
                             </h3>
+                            <button
+                                onClick={() => setInspectedRow(null)}
+                                className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+                            >
+                                <X className="w-5 h-5 text-slate-500" />
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto">
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                                {Object.entries(inspectedRow).map(([key, val]) => (
+                                    <div key={key} className="border-b border-slate-50 pb-2">
+                                        <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">{key}</span>
+                                        <span className="text-sm text-slate-700 font-mono break-all">
+                                            {typeof val === 'number' && val > 10000000 ? val.toFixed(0) : String(val)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                            <button
+                                onClick={() => setInspectedRow(null)}
+                                className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg"
+                            >
+                                關閉
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
-                            <div className="overflow-x-auto border rounded-lg">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+            {reconRecordDetail && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden">
+                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                            <div>
+                                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                    <Info className="w-5 h-5 text-blue-500" />
+                                    對賬記錄
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    {reconRecordDetail.method} / {reconRecordDetail.month}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setReconRecordDetail(null)}
+                                className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+                            >
+                                <X className="w-5 h-5 text-slate-500" />
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                    <div className="text-xs text-slate-500">對賬時間</div>
+                                    <div className="font-semibold text-slate-700">{formatDateInTaipei(reconRecordDetail.reconciledAt)}</div>
+                                </div>
+                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                    <div className="text-xs text-slate-500">對賬區間</div>
+                                    <div className="font-semibold text-slate-700">{reconRecordDetail.rangeStart} ~ {reconRecordDetail.rangeEnd}</div>
+                                </div>
+                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                    <div className="text-xs text-slate-500">付款方式</div>
+                                    <div className="font-semibold text-slate-700">{reconRecordDetail.method}</div>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-slate-50 border-b border-slate-200">
                                         <tr>
-                                            <th className="px-6 py-3 text-center w-24">月份</th>
-                                            <th className="px-6 py-3 text-right">2024年 入園人次</th>
-                                            <th className="px-6 py-3 text-right">2025年 入園人次</th>
-                                            <th className="px-6 py-3 text-right">2026年 入園人次</th>
+                                            <th className="px-4 py-3 text-center border-r border-slate-200 w-24">對賬狀態</th>
+                                            <th className="px-4 py-3 text-slate-600 font-bold">系統交易時間</th>
+                                            <th className="px-4 py-3 text-slate-600 font-bold">訂單編號</th>
+                                            <th className="px-4 py-3 text-right text-slate-600 font-bold">系統金額</th>
+                                            <th className="px-4 py-3 text-slate-600 font-bold">發票號碼</th>
+                                            <th className="px-4 py-3 text-slate-600 font-bold">平台交易時間</th>
+                                            <th className="px-4 py-3 text-slate-600 font-bold">平台序號</th>
+                                            <th className="px-4 py-3 text-right text-slate-600 font-bold">平台金額</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
-                                            const v2024 = visitorData[2024]?.[m] || 0;
-                                            const v2025 = visitorData[2025]?.[m] || 0;
-                                            const v2026 = visitorData[2026]?.[m] || 0;
-
+                                        {reconRecordDetail.matches?.map((match: any, idx: number) => {
+                                            const sys = match.system;
+                                            const plat = match.platform;
+                                            const status = match.status;
                                             return (
-                                                <tr key={m} className="hover:bg-slate-50">
-                                                    <td className="px-6 py-4 text-center font-medium text-slate-700">{m}月</td>
-                                                    <td className="px-6 py-4 text-right font-mono text-slate-600">
-                                                        {v2024 > 0 ? new Intl.NumberFormat('en-US').format(v2024) : '-'}
+                                                <tr key={`${match.status}-${idx}`} className="hover:bg-slate-50">
+                                                    <td className="px-4 py-3 text-center border-r border-slate-200">
+                                                        {status === 'matched' ? (
+                                                            <div className="flex flex-col items-center">
+                                                                <CheckCircle className="w-5 h-5 text-emerald-500" />
+                                                                <span className="text-[10px] text-emerald-600 font-bold mt-1">已匹配</span>
+                                                            </div>
+                                                        ) : status === 'refund_skipped' ? (
+                                                            <div className="flex flex-col items-center">
+                                                                <CheckCircle className="w-5 h-5 text-amber-500" />
+                                                                <span className="text-[10px] text-amber-600 font-bold mt-1">平台不計</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex flex-col items-center">
+                                                                <AlertTriangle className="w-5 h-5 text-red-500" />
+                                                                <span className="text-[10px] text-red-600 font-bold mt-1">未匹配</span>
+                                                            </div>
+                                                        )}
                                                     </td>
-                                                    <td className="px-6 py-4 text-right font-mono text-blue-600 font-medium">
-                                                        {v2025 > 0 ? new Intl.NumberFormat('en-US').format(v2025) : '-'}
+                                                    <td className={`px-4 py-3 text-xs ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
+                                                        {sys ? formatDateInTaipei(sys.date) : '缺失記錄'}
                                                     </td>
-                                                    <td className="px-6 py-4 text-right font-mono text-slate-400">
-                                                        {v2026 > 0 ? new Intl.NumberFormat('en-US').format(v2026) : '-'}
+                                                    <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
+                                                        {sys?.id || '-'}
+                                                    </td>
+                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${!sys ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                        {sys ? `$${Number(sys.amount).toLocaleString()}` : '-'}
+                                                    </td>
+                                                    <td className={`px-4 py-3 font-mono ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
+                                                        {sys?.invoiceNumber || '無發票'}
+                                                    </td>
+                                                    <td className={`px-4 py-3 text-xs ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-500'}`}>
+                                                        {plat ? formatDateInTaipei(plat.date) : (status === 'refund_skipped' ? '-' : '缺失記錄')}
+                                                    </td>
+                                                    <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-600'}`}>
+                                                        {plat?.txId || (status === 'refund_skipped' ? '-' : '-')}
+                                                    </td>
+                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-700'}`}>
+                                                        {plat ? `$${Number(plat.amount).toLocaleString()}` : (status === 'refund_skipped' ? '-' : '-')}
                                                     </td>
                                                 </tr>
                                             );
                                         })}
-                                        {/* Total Row */}
-                                        <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
-                                            <td className="px-6 py-4 text-center text-slate-800">總計</td>
-                                            <td className="px-6 py-4 text-right font-mono text-slate-800">
-                                                {new Intl.NumberFormat('en-US').format(
-                                                    Object.values(visitorData[2024] || {}).reduce((a, b) => a + b, 0)
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-mono text-blue-700">
-                                                {new Intl.NumberFormat('en-US').format(
-                                                    Object.values(visitorData[2025] || {}).reduce((a, b) => a + b, 0)
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-mono text-slate-500">
-                                                {new Intl.NumberFormat('en-US').format(
-                                                    Object.values(visitorData[2026] || {}).reduce((a, b) => a + b, 0)
-                                                )}
-                                            </td>
-                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
-                            <div className="mt-4 text-xs text-slate-400 text-right">
-                                資料來源：兒童新樂園入園人次統計表 (PDF)
-                            </div>
+                        </div>
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                            <button
+                                onClick={() => setReconRecordDetail(null)}
+                                className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg"
+                            >
+                                關閉
+                            </button>
                         </div>
                     </div>
+                </div>
+            )}
+        </div>
+                    </div >
                 )
-            }
+}
 
-            {
-                activeTab === 'marketing' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        {/* Marketing Strategy Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-2xl text-white shadow-lg">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="bg-white/20 p-2 rounded-lg"><Target className="w-6 h-6" /></div>
-                                    <h3 className="font-bold">校外教學轉化模式</h3>
-                                </div>
-                                <p className="text-sm text-indigo-100 mb-4">針對低預算學生族群，採取「班級對抗賽」與「多人同行優惠」。</p>
-                                <div className="flex justify-between items-end">
-                                    <span className="text-xs bg-white/20 px-2 py-1 rounded">建議折扣: 75折</span>
-                                    <button className="text-xs font-bold underline">查看方案細節</button>
-                                </div>
+{/* Growth Tab */ }
+{
+    activeTab === 'growth' && (
+        <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-800">營收成長分析 (MoM / YoY)</h3>
+                        <p className="text-sm text-slate-500">比較當前月份與上月、去年同期的營收變化</p>
+                    </div>
+                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <span className="text-sm font-semibold text-slate-700">2026 年度目標營業額:</span>
+                        <div className="flex items-center gap-2 relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                            <input
+                                type="text"
+                                value={target2026.toLocaleString()}
+                                onChange={(e) => {
+                                    const rawValue = e.target.value.replace(/,/g, '');
+                                    const numValue = parseInt(rawValue) || 0;
+                                    setTarget2026(Math.max(0, numValue));
+                                }}
+                                className="pl-6 pr-3 py-1.5 w-32 md:w-40 border border-slate-300 rounded-lg text-right font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${isSavingTarget
+                            ? 'text-blue-600 bg-blue-50 animate-pulse'
+                            : 'text-slate-400 bg-slate-100'
+                            }`}>
+                            {isSavingTarget ? (
+                                <>
+                                    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" />
+                                    自動儲存中...
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle className="w-3 h-3 text-green-500" />
+                                    已自動儲存
+                                </>
+                            )}
+                        </div>
+                        <span className="text-xs text-slate-500 hidden md:inline">(依 2025 比例自動分配)</span>
+                    </div>
+                </div>
+
+                {/* Pivot Table Style Growth Report */}
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                            <tr>
+                                <th className="px-4 py-3">月份</th>
+                                <th className="px-4 py-3 text-right">2024年</th>
+                                <th className="px-4 py-3 text-right">2025年</th>
+                                <th className="px-4 py-3 text-right bg-blue-50/50 text-blue-800 border-l border-blue-100">2026 目標</th>
+                                <th className="px-4 py-3 text-right">2026年</th>
+                                <th className="px-4 py-3 text-right">YoY (26 vs 25)</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {yearPivotData.map((row) => (
+                                <tr key={row.month} className="hover:bg-slate-50/50">
+                                    <td className="px-4 py-3 font-medium text-slate-700">{row.month}月</td>
+                                    <td className="px-4 py-3 text-right text-slate-600">
+                                        {row['2024'] ? `$${new Intl.NumberFormat('en-US').format(row['2024'])}` : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-slate-600">
+                                        {row['2025'] ? `$${new Intl.NumberFormat('en-US').format(row['2025'])}` : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-mono text-blue-600 bg-blue-50/30 border-l border-blue-100">
+                                        ${new Intl.NumberFormat('en-US').format(Math.round(row.target2026))}
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-bold text-slate-800">
+                                        {row['2026'] ? `$${new Intl.NumberFormat('en-US').format(row['2026'])}` : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        {row.yoy === null ? '-' : (
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${row.yoy > 0 ? 'bg-green-100 text-green-700' :
+                                                row.yoy < 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                                                }`}>
+                                                {row.yoy > 0 ? '+' : ''}{row.yoy.toFixed(1)}%
+                                            </span>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-200">
+                            <tr>
+                                <td className="px-4 py-3 text-slate-800">年度總計</td>
+                                <td className="px-4 py-3 text-right text-slate-800">
+                                    ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r['2024'] || 0), 0))}
+                                </td>
+                                <td className="px-4 py-3 text-right text-slate-800">
+                                    ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r['2025'] || 0), 0))}
+                                </td>
+                                <td className="px-4 py-3 text-right text-blue-800 bg-blue-50/50 border-l border-blue-100">
+                                    ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r.target2026 || 0), 0))}
+                                </td>
+                                <td className="px-4 py-3 text-right text-slate-900 border-l border-r border-slate-200 bg-slate-200/50">
+                                    ${new Intl.NumberFormat('en-US').format(yearPivotData.reduce((sum, r) => sum + (r['2026'] || 0), 0))}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                    {(() => {
+                                        const total2025 = yearPivotData.reduce((sum, r) => sum + (r['2025'] || 0), 0);
+                                        const total2026 = yearPivotData.reduce((sum, r) => sum + (r['2026'] || 0), 0);
+                                        if (total2025 === 0) return '-';
+                                        const yoy = ((total2026 - total2025) / total2025) * 100;
+                                        return (
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${yoy > 0 ? 'bg-green-100 text-green-800' :
+                                                yoy < 0 ? 'bg-red-100 text-red-800' : 'bg-slate-200 text-slate-700'
+                                                }`}>
+                                                {yoy > 0 ? '+' : ''}{yoy.toFixed(1)}%
+                                            </span>
+                                        );
+                                    })()}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+{/* Invoice Tab */ }
+{
+    activeTab === 'invoice' && (
+        <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                {/* Header & Sub-tabs */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-800">
+                            {invoiceSubTab === 'list' ? '發票交易明細' : '異常偵測 (斷號分析)'}
+                        </h3>
+                        <p className="text-sm text-slate-500">
+                            {invoiceSubTab === 'list'
+                                ? '可透過日期區間與支付方式篩選特定交易'
+                                : '自動檢測發票號碼連續性 (忽略支付方式篩選)'}
+                        </p>
+                    </div>
+
+                    <div className="flex bg-slate-100 p-1 rounded-lg self-start md:self-auto">
+                        <button
+                            onClick={() => setInvoiceSubTab('list')}
+                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${invoiceSubTab === 'list'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            明細列表
+                        </button>
+                        <button
+                            onClick={() => setInvoiceSubTab('anomaly')}
+                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${invoiceSubTab === 'anomaly'
+                                ? 'bg-white text-red-600 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            異常偵測
+                        </button>
+                    </div>
+                </div>
+
+                {/* Filters Toolbar */}
+                <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-slate-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => {
+                                const now = new Date();
+                                const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                                const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                setInvoiceStartDate(formatDate(firstDayThisMonth));
+                                setInvoiceEndDate(formatDate(now));
+                            }}
+                            className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors"
+                        >
+                            本月
+                        </button>
+                        <button
+                            onClick={() => {
+                                const now = new Date();
+                                const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                                const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+                                const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                setInvoiceStartDate(formatDate(firstDayLastMonth));
+                                setInvoiceEndDate(formatDate(lastDayLastMonth));
+                            }}
+                            className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors"
+                        >
+                            上個月
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-500 uppercase">日期範圍</span>
+                        <input
+                            type="date"
+                            value={invoiceStartDate}
+                            onChange={(e) => setInvoiceStartDate(e.target.value)}
+                            className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500"
+                        />
+                        <span className="text-slate-400">~</span>
+                        <input
+                            type="date"
+                            value={invoiceEndDate}
+                            onChange={(e) => setInvoiceEndDate(e.target.value)}
+                            className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500"
+                        />
+                    </div>
+
+                    {invoiceSubTab === 'list' && (
+                        <div className="flex flex-wrap items-center gap-3 ml-auto md:ml-0">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-slate-500 uppercase">支付方式</span>
+                                <select
+                                    value={invoicePaymentFilter}
+                                    onChange={(e) => setInvoicePaymentFilter(e.target.value)}
+                                    className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500 min-w-[120px]"
+                                >
+                                    <option value="All">全部</option>
+                                    {paymentMethodOptions.map(p => (
+                                        <option key={p} value={p}>{p}</option>
+                                    ))}
+                                </select>
                             </div>
-                            <div className="bg-gradient-to-br from-orange-400 to-rose-500 p-6 rounded-2xl text-white shadow-lg">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="bg-white/20 p-2 rounded-lg"><Users className="w-6 h-6" /></div>
-                                    <h3 className="font-bold">10歲以下家庭引流</h3>
-                                </div>
-                                <p className="text-sm text-orange-100 mb-4">提供「AR 觀戰模式」與幼童親手贈品，解決無法戴頭盔的痛點。</p>
-                                <div className="flex justify-between items-end">
-                                    <span className="text-xs bg-white/20 px-2 py-1 rounded">建議方案: 贈送貼紙</span>
-                                    <button className="text-xs font-bold underline">查看方案細節</button>
-                                </div>
+
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-slate-500 uppercase">交易類型</span>
+                                <select
+                                    value={invoiceTransactionTypeFilter}
+                                    onChange={(e) => setInvoiceTransactionTypeFilter(e.target.value)}
+                                    className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500 min-w-[120px]"
+                                >
+                                    <option value="All">全部</option>
+                                    {transactionTypeOptions.map(t => (
+                                        <option key={t} value={t}>{t}</option>
+                                    ))}
+                                </select>
                             </div>
-                            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-6 rounded-2xl text-white shadow-lg">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="bg-white/20 p-2 rounded-lg"><Zap className="w-6 h-6" /></div>
-                                    <h3 className="font-bold">美食街等餐經濟</h3>
-                                </div>
-                                <p className="text-sm text-emerald-100 mb-4">與 2F 美食街合辦「等餐 10 分鐘，XR 現折 50 元」活。活水引流。</p>
-                                <div className="flex justify-between items-end">
-                                    <span className="text-xs bg-white/20 px-2 py-1 rounded">目標轉化: +15%</span>
-                                    <button className="text-xs font-bold underline">查看方案細節</button>
-                                </div>
+
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-slate-500 uppercase">發票開立類型</span>
+                                <select
+                                    value={invoiceIssueTypeFilter}
+                                    onChange={(e) => setInvoiceIssueTypeFilter(e.target.value)}
+                                    className="px-2 py-1 border border-slate-200 rounded text-sm outline-none focus:border-blue-500 min-w-[140px]"
+                                >
+                                    <option value="All">全部</option>
+                                    <option value="__EMPTY__">空白</option>
+                                    {invoiceIssueTypeOptions.map(t => (
+                                        <option key={t} value={t}>{t}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
+                    )}
 
-                        {/* Campaign Management */}
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                    <Tag className="w-5 h-5 text-blue-600" />
-                                    當前行銷活動管理
-                                </h3>
-                                <button
-                                    onClick={() => setShowPromoModal(true)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-all"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    新增促銷代碼
-                                </button>
+                    {(() => {
+                        const now = new Date();
+                        const defaultStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+                        const defaultEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                        const isDirty = invoiceStartDate !== defaultStart || invoiceEndDate !== defaultEnd ||
+                            invoicePaymentFilter !== 'All' || invoiceTransactionTypeFilter !== 'All' || invoiceIssueTypeFilter !== 'All';
+                        if (!isDirty) return null;
+                        return (
+                            <button
+                                onClick={() => {
+                                    const resetNow = new Date();
+                                    const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                    const firstDay = new Date(resetNow.getFullYear(), resetNow.getMonth(), 1);
+                                    setInvoiceStartDate(formatDate(firstDay));
+                                    setInvoiceEndDate(formatDate(resetNow));
+                                    setInvoicePaymentFilter('All');
+                                    setInvoiceTransactionTypeFilter('All');
+                                    setInvoiceIssueTypeFilter('All');
+                                }}
+                                className="ml-auto text-xs text-blue-600 hover:text-blue-800 underline px-2"
+                            >
+                                清除篩選
+                            </button>
+                        );
+                    })()}
+                </div>
+
+                {/* Content Area */}
+                {invoiceSubTab === 'list' ? (
+                    <div className="space-y-4">
+                        <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-4 py-3">交易狀態</th>
+                                        <th className="px-4 py-3 text-right">筆數</th>
+                                        <th className="px-4 py-3 text-right">估算金額</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {invoiceStatusSummary.rows.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={3} className="px-4 py-6 text-center text-slate-500">沒有符合條件的交易</td>
+                                        </tr>
+                                    ) : (
+                                        <>
+                                            {invoiceStatusSummary.rows.map(row => (
+                                                <tr key={row.status} className="hover:bg-slate-50">
+                                                    <td className="px-4 py-3 text-slate-700">{row.status}</td>
+                                                    <td className="px-4 py-3 text-right font-mono text-slate-700">{row.count.toLocaleString()}</td>
+                                                    <td className="px-4 py-3 text-right font-mono text-slate-700">
+                                                        ${Math.round(row.amount).toLocaleString()}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            <tr className="bg-slate-50 font-bold">
+                                                <td className="px-4 py-3 text-slate-800">總計</td>
+                                                <td className="px-4 py-3 text-right font-mono text-slate-800">{invoiceStatusSummary.total.count.toLocaleString()}</td>
+                                                <td className="px-4 py-3 text-right font-mono text-slate-800">
+                                                    ${Math.round(invoiceStatusSummary.total.amount).toLocaleString()}
+                                                </td>
+                                            </tr>
+                                        </>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="text-right text-xs text-slate-500">
+                            共 {invoiceTabData.length} 筆資料
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-4 py-3">訂單編號</th>
+                                        <th className="px-4 py-3">發票號碼</th>
+                                        <th className="px-4 py-3">發票開立類型</th>
+                                        <th className="px-4 py-3">交易時間</th>
+                                        <th className="px-4 py-3 text-right">發票金額</th>
+                                        <th className="px-4 py-3">支付方式</th>
+                                        <th className="px-4 py-3">備註</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {invoiceTabData.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} className="p-8 text-center text-slate-500">沒有符合條件的發票資料</td>
+                                        </tr>
+                                    ) : (
+                                        <InvoiceTablePagination data={invoiceTabData} refundSet={refundSet} />
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : (
+                    // Anomaly Tab Content
+                    <div className="space-y-4">
+                        {invoiceAnomalyData.length === 0 ? (
+                            <div className="p-12 text-center text-slate-500 flex flex-col items-center">
+                                <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
+                                <p className="text-lg">目前日期範圍內未發現異常斷號</p>
                             </div>
-
+                        ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                    <thead className="bg-red-50 text-red-800 border-b border-red-100">
                                         <tr>
-                                            <th className="px-6 py-4">活動名稱</th>
-                                            <th className="px-6 py-4">促銷代碼</th>
-                                            <th className="px-6 py-4">類型</th>
-                                            <th className="px-6 py-4 text-right">已使用</th>
-                                            <th className="px-6 py-4 text-right">轉化額</th>
-                                            <th className="px-6 py-4">狀態</th>
-                                            <th className="px-6 py-4 text-right">操作</th>
+                                            <th className="p-4">年份-月份</th>
+                                            <th className="p-4">異常類型</th>
+                                            <th className="p-4">異常描述</th>
+                                            <th className="p-4">涉及號碼區間</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {marketingCampaigns.length === 0 ? (
-                                            <tr>
-                                                <td className="px-6 py-8 text-center text-slate-400" colSpan={7}>目前無進行中的行銷活動。點擊上方按鈕新增。</td>
+                                        {invoiceAnomalyData.map((issue, idx) => (
+                                            <tr key={idx} className="hover:bg-red-50/30">
+                                                <td className="p-4 font-medium">{issue.ym}</td>
+                                                <td className="p-4">
+                                                    <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">{issue.type}</span>
+                                                </td>
+                                                <td className="p-4 text-slate-700">{issue.desc}</td>
+                                                <td className="p-4 font-mono text-xs text-slate-500">{issue.invoices.join(', ')}</td>
                                             </tr>
-                                        ) : (
-                                            marketingCampaigns.map((c, idx) => {
-                                                const stats = campaignStats[c.code] || { used: 0, revenue: 0 };
-                                                const isActive = new Date() >= new Date(c.startDate) && (!c.endDate || new Date() <= new Date(c.endDate));
-
-                                                return (
-                                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="px-6 py-4 font-medium text-slate-800">{c.name}</td>
-                                                        <td className="px-6 py-4">
-                                                            <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded text-xs font-mono font-bold border border-blue-100 uppercase">
-                                                                {c.code}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-slate-600">{c.type === 'discount' ? '折扣碼' : '贈品方案'}</td>
-                                                        <td className="px-6 py-4 text-right font-mono font-bold text-blue-600">{stats.used} 次</td>
-                                                        <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600">${stats.revenue.toLocaleString()}</td>
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
-                                                                <span className={`text-xs ${isActive ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
-                                                                    {isActive ? '進行中' : '已結束'}
-                                                                </span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right">
-                                                            <button
-                                                                onClick={() => {
-                                                                    const newList = marketingCampaigns.filter((_, i) => i !== idx);
-                                                                    setMarketingCampaigns(newList);
-                                                                    handleSaveMarketingCampaigns(newList);
-                                                                }}
-                                                                className="text-slate-300 hover:text-red-500 transition-colors"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
-                                        )}
+                                        ))}
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
-
-                        {showPromoModal && (
-                            <PromoCodeModal
-                                onClose={() => setShowPromoModal(false)}
-                                onSave={(newCampaign) => {
-                                    const newList = [...marketingCampaigns, newCampaign];
-                                    setMarketingCampaigns(newList);
-                                    handleSaveMarketingCampaigns(newList);
-                                    setShowPromoModal(false);
-                                }}
-                            />
                         )}
                     </div>
-                )
-            }
-
-            {/* AI CFO Chatbot */}
-            <AiCfoChat
-                dataContext={{
-                    stats,
-                    overviewStats,
-                    selectedYear,
-                    selectedMonth,
-                    yearPivotData,
-                    growthStats,
-                    target2026,
-                    marketingCampaigns,
-                    sampleGranular: Object.entries(granularData).slice(0, 5).map(([k, v]) => ({ date: k, ...v as any }))
-                }}
-            />
+                )}
+            </div>
         </div>
+    )
+}
+
+{/* 2024 Ops Tab */ }
+{
+    activeTab === 'ops2024' && (
+        <div className="space-y-6 animate-in fade-in duration-500">
+            <AttractionManager
+                attractions={attractions}
+                setAttractions={setAttractions}
+                updateSystemConfig={updateSystemConfig}
+            />
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                        <h3 className="text-lg font-bold text-slate-800">2024年 每日營收報表</h3>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => handleSaveVisitorStats()}
+                            disabled={savingVisitors}
+                            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
+                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
+                                }`}
+                        >
+                            <Save className="w-4 h-4" />
+                            <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
+                        </button>
+                        <select
+                            className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                            value={ops2024Month}
+                            onChange={(e) => setOps2024Month(parseInt(e.target.value))}
+                        >
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                <option key={m} value={m}>{m} 月</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {/* KPI Metrics Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                        <h4 className="text-sm font-semibold text-blue-700 mb-1">本月實際業績</h4>
+                        <div className="text-2xl font-bold text-blue-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2024KPI.actual))}</div>
+                    </div>
+                    <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
+                        <h4 className="text-sm font-semibold text-pink-700 mb-1">當月體驗人次</h4>
+                        <div className="text-2xl font-bold text-pink-900">{new Intl.NumberFormat('en-US').format(ops2024KPI.totalVisitors)} 人</div>
+                    </div>
+                    <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
+                        <h4 className="text-sm font-semibold text-cyan-700 mb-1">人均消費 (ARPU)</h4>
+                        <div className="text-2xl font-bold text-cyan-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2024KPI.arpu))}</div>
+                    </div>
+                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                        <h4 className="text-sm font-semibold text-amber-700 mb-1">達標率</h4>
+                        <div className="text-2xl font-bold text-amber-900">{ops2024KPI.rate.toFixed(1)}%</div>
+                    </div>
+                </div>
+
+                {/* Success/Failure Analysis Section */}
+                <div className="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
+                    <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <Info className="w-5 h-5 text-blue-600" />
+                        2024年 {ops2024Month}月 運營分析
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                            <div className="flex items-start gap-3">
+                                <div className="mt-1 p-1 bg-green-100 rounded-full"><CheckCircle className="w-4 h-4 text-green-600" /></div>
+                                <div>
+                                    <p className="font-bold text-slate-700 text-sm">表現亮點</p>
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                        {ops2024KPI.rate >= 100 ? '本月成功達標，主要受益於假期人流。' : '本月營收主要集中在週末與特定活動期間。'}
+                                        ARPU 表現為 ${Math.round(ops2024KPI.arpu)}，反映出穩定的客單價。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="flex items-start gap-3">
+                                <div className="mt-1 p-1 bg-red-100 rounded-full"><AlertTriangle className="w-4 h-4 text-red-600" /></div>
+                                <div>
+                                    <p className="font-bold text-slate-700 text-sm">優化空間</p>
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                        {ops2024KPI.rate < 100 ? `達成率僅 ${ops2024KPI.rate.toFixed(1)}%，需檢討平日促銷方案。` : '建議在非尖峰時段進一步提升轉換率。'}
+                                        觀察到週一休園效應對週二營收的潛發影響。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <AttractionRankingCard
+                    year={2024}
+                    month={ops2024Month}
+                    granularData={granularData}
+                    attractions={attractions}
+                />
+
+                <DailyRevenueVisitorsChart
+                    title={`2024年 ${ops2024Month}月 每日營收及體驗人次圖`}
+                    data={ops2024Data}
+                />
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                            <tr>
+                                <th className="px-4 py-3">日期</th>
+                                <th className="px-4 py-3">星期</th>
+                                <th className="px-4 py-3 text-right">票務收入</th>
+                                <th className="px-4 py-3 text-right">包場收入</th>
+                                <th className="px-4 py-3 text-right">當日收入</th>
+                                <th className="px-4 py-3 text-right text-slate-500">發票筆數</th>
+                                <th className="px-4 py-3 text-right text-amber-600">平均交易價</th>
+                                <th className="px-4 py-3 text-right">體驗人次</th>
+                                <th className="px-4 py-3 text-right">包場人次</th>
+                                <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
+                                <th className="px-4 py-3">備註</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {ops2024Data.map((row) => (
+                                <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
+                                    <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
+                                    <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                        {row.weekDay}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                                        ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-purple-600 font-mono">
+                                        ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
+                                        ${new Intl.NumberFormat('en-US').format(row.revenue)}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-slate-500 font-mono">
+                                        {row.txCount > 0 ? row.txCount : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-amber-600 font-mono">
+                                        {row.atv > 0 ? `$${new Intl.NumberFormat('en-US').format(Math.round(row.atv))}` : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <span className="font-bold text-blue-600">{row.visitorCount}</span>
+                                            <button
+                                                onClick={() => setEditingGranularDate(row.dateStr)}
+                                                className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
+                                                title="點擊編輯各項目明細"
+                                            >
+                                                <Edit3 className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
+                                    <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
+                                        ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <input
+                                            type="text"
+                                            value={row.remark}
+                                            onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
+                                            placeholder="..."
+                                            className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-500"
+                                        />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+{/* 2025 Ops Tab */ }
+{
+    activeTab === 'ops2025' && (
+        <div className="space-y-6 animate-in fade-in duration-500">
+            <AttractionManager
+                attractions={attractions}
+                setAttractions={setAttractions}
+                updateSystemConfig={updateSystemConfig}
+            />
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                        <h3 className="text-lg font-bold text-slate-800">2025年 每日營收報表</h3>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => handleSaveVisitorStats()}
+                            disabled={savingVisitors}
+                            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
+                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
+                                }`}
+                        >
+                            <Save className="w-4 h-4" />
+                            <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
+                        </button>
+                        <select
+                            className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                            value={ops2025Month}
+                            onChange={(e) => setOps2025Month(parseInt(e.target.value))}
+                        >
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                <option key={m} value={m}>{m} 月</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {/* KPI Metrics Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                        <h4 className="text-sm font-semibold text-blue-700 mb-1">本月實際業績</h4>
+                        <div className="text-2xl font-bold text-blue-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2025KPI.actual))}</div>
+                    </div>
+                    <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
+                        <h4 className="text-sm font-semibold text-pink-700 mb-1">當月體驗人次</h4>
+                        <div className="text-2xl font-bold text-pink-900">{new Intl.NumberFormat('en-US').format(ops2025KPI.totalVisitors)} 人</div>
+                    </div>
+                    <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
+                        <h4 className="text-sm font-semibold text-cyan-700 mb-1">人均消費 (ARPU)</h4>
+                        <div className="text-2xl font-bold text-cyan-900">${new Intl.NumberFormat('en-US').format(Math.round(ops2025KPI.arpu))}</div>
+                    </div>
+                    <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                        <h4 className="text-sm font-semibold text-emerald-700 mb-1">達成率</h4>
+                        <div className="text-2xl font-bold text-emerald-900">{ops2025KPI.rate.toFixed(1)}%</div>
+                    </div>
+                </div>
+
+                <AttractionRankingCard
+                    year={2025}
+                    month={ops2025Month}
+                    granularData={granularData}
+                    attractions={attractions}
+                />
+
+                <DailyRevenueVisitorsChart
+                    title={`2025年 ${ops2025Month}月 每日營收及體驗人次圖`}
+                    data={ops2025Data}
+                />
+
+                {/* Success/Failure Analysis Section */}
+                <div className="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
+                    <h4 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <Info className="w-5 h-5 text-blue-600" />
+                        2025年 {ops2025Month}月 運營分析
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                            <div className="flex items-start gap-3">
+                                <div className="mt-1 p-1 bg-green-100 rounded-full"><CheckCircle className="w-4 h-4 text-green-600" /></div>
+                                <div>
+                                    <p className="font-bold text-slate-700 text-sm">表現亮點</p>
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                        {ops2025KPI.rate >= 100 ? '本月份展現強勁增長，達成率極高。' : 'ARPU 貢獻穩定，維持在市場平均水準。'}
+                                        體驗人次穩定突破 {new Intl.NumberFormat('en-US').format(ops2025KPI.totalVisitors)}。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="flex items-start gap-3">
+                                <div className="mt-1 p-1 bg-red-100 rounded-full"><AlertTriangle className="w-4 h-4 text-red-600" /></div>
+                                <div>
+                                    <p className="font-bold text-slate-700 text-sm">優化空間</p>
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                        {ops2025KPI.rate < 100 ? '部分平日時段業績未如預期，可加強校園折扣方案。' : '達標後應思考如何優化服務流程以應對高人流。'}
+                                        天氣因素對營收波動影響顯著。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                            <tr>
+                                <th className="px-4 py-3">日期</th>
+                                <th className="px-4 py-3">星期</th>
+                                <th className="px-4 py-3 text-right">票務收入</th>
+                                <th className="px-4 py-3 text-right">包場收入</th>
+                                <th className="px-4 py-3 text-right">當日收入</th>
+                                <th className="px-4 py-3 text-right text-slate-500">發票筆數</th>
+                                <th className="px-4 py-3 text-right text-amber-600">平均交易價</th>
+                                <th className="px-4 py-3 text-right">體驗人次</th>
+                                <th className="px-4 py-3 text-right">包場人次</th>
+                                <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
+                                <th className="px-4 py-3">備註</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {ops2025Data.map((row) => (
+                                <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
+                                    <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
+                                    <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                        {row.weekDay}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                                        ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-purple-600 font-mono">
+                                        ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
+                                        ${new Intl.NumberFormat('en-US').format(row.revenue)}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-slate-500 font-mono">
+                                        {row.txCount > 0 ? row.txCount : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-amber-600 font-mono">
+                                        {row.atv > 0 ? `$${new Intl.NumberFormat('en-US').format(Math.round(row.atv))}` : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <span className="font-bold text-blue-600">{row.visitorCount}</span>
+                                            <button
+                                                onClick={() => setEditingGranularDate(row.dateStr)}
+                                                className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
+                                                title="點擊編輯各項目明細"
+                                            >
+                                                <Edit3 className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
+                                    <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
+                                        ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <input
+                                            type="text"
+                                            value={row.remark}
+                                            onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
+                                            placeholder="..."
+                                            className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-500"
+                                        />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+{/* 2026 Ops Tab */ }
+{
+    activeTab === 'ops2026' && (
+        <div className="space-y-6 animate-in fade-in duration-500">
+            <AttractionManager
+                attractions={attractions}
+                setAttractions={setAttractions}
+                updateSystemConfig={updateSystemConfig}
+            />
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                        <h3 className="text-lg font-bold text-slate-800">2026年 每日營收報表</h3>
+                        {role !== 'ops' && (
+                            <span className="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded">唯讀模式 (唯 Ops 可存儲)</span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => handleSaveVisitorStats()}
+                            disabled={savingVisitors}
+                            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-sm ${savingVisitors
+                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
+                                }`}
+                        >
+                            <Save className="w-4 h-4" />
+                            <span>{savingVisitors ? '儲存中...' : '儲存體驗人次'}</span>
+                        </button>
+                        <select
+                            className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg shadow-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                            value={ops2026Month}
+                            onChange={(e) => setOps2026Month(parseInt(e.target.value))}
+                        >
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                <option key={m} value={m}>{m} 月</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {/* KPI Metrics Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 mb-8">
+                    {/* Card 1: Monthly Target */}
+                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                        <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-blue-700">業務目標 ({ops2026Month}月)</h4>
+                            <TrendingUp className="w-4 h-4 text-blue-500" />
+                        </div>
+                        <div className="text-2xl font-bold text-blue-900">
+                            ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.target))}
+                        </div>
+                        <div className="text-xs text-blue-600 mt-1">
+                            依年度目標佔比分配
+                        </div>
+                    </div>
+
+                    {/* Card 2: Daily Benchmark */}
+                    <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                        <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-purple-700">每日基準業績</h4>
+                            <Calendar className="w-4 h-4 text-purple-500" />
+                        </div>
+                        <div className="text-2xl font-bold text-purple-900">
+                            ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.benchmark))}
+                        </div>
+                        <div className="text-xs text-purple-600 mt-1">
+                            {ops2026KPI.workingDays} 個工作天 (排除週一)
+                        </div>
+                    </div>
+
+                    {/* Card 3: Actual Revenue */}
+                    <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                        <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-emerald-700">本月實際業績</h4>
+                            <DollarSign className="w-4 h-4 text-emerald-500" />
+                        </div>
+                        <div className="text-2xl font-bold text-emerald-900">
+                            ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.actual))}
+                        </div>
+                        <div className="text-xs text-emerald-600 mt-1">
+                            {ops2026Month}月 營收累計
+                        </div>
+                    </div>
+
+                    {/* Card 4: Achievement Rate */}
+                    <div className={`p-4 rounded-xl border ${ops2026KPI.rate >= 100 ? 'bg-orange-50 border-orange-100' : 'bg-slate-50 border-slate-200'
+                        }`}>
+                        <div className="flex items-center justify-between mb-2">
+                            <h4 className={`text-sm font-semibold ${ops2026KPI.rate >= 100 ? 'text-orange-700' : 'text-slate-600'
+                                }`}>達成率</h4>
+                            <CheckCircle className={`w-4 h-4 ${ops2026KPI.rate >= 100 ? 'text-orange-500' : 'text-slate-400'
+                                }`} />
+                        </div>
+                        <div className={`text-2xl font-bold ${ops2026KPI.rate >= 100 ? 'text-orange-800' : 'text-slate-800'
+                            }`}>
+                            {ops2026KPI.rate.toFixed(1)}%
+                        </div>
+                        <div className={`text-xs mt-1 ${ops2026KPI.rate >= 100 ? 'text-orange-600' : 'text-slate-500'
+                            }`}>
+                            {ops2026KPI.rate >= 100 ? '已達標' : `還差 ${(100 - ops2026KPI.rate).toFixed(1)}%`}
+                        </div>
+                    </div>
+
+                    {/* Card 5: Monthly Visitors */}
+                    <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
+                        <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-pink-700">當月體驗人次</h4>
+                            <Users className="w-4 h-4 text-pink-500" />
+                        </div>
+                        <div className="text-2xl font-bold text-pink-900">
+                            {new Intl.NumberFormat('en-US').format(ops2026KPI.totalVisitors)}
+                        </div>
+                        <div className="text-xs text-pink-600 mt-1">
+                            人
+                        </div>
+                    </div>
+
+                    {/* Card 6: ARPU */}
+                    <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
+                        <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-cyan-700">人均消費 (ARPU)</h4>
+                            <TrendingUp className="w-4 h-4 text-cyan-500" />
+                        </div>
+                        <div className="text-2xl font-bold text-cyan-900">
+                            ${new Intl.NumberFormat('en-US').format(Math.round(ops2026KPI.arpu))}
+                        </div>
+                        <div className="text-xs text-cyan-600 mt-1">
+                            平均每人貢獻
+                        </div>
+                    </div>
+                </div>
+
+                <AttractionRankingCard
+                    year={2026}
+                    month={ops2026Month}
+                    granularData={granularData}
+                    attractions={attractions}
+                />
+
+                <DailyRevenueVisitorsChart
+                    title={`2026年 ${ops2026Month}月 每日營收及體驗人次圖`}
+                    data={ops2026Data}
+                />
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                            <tr>
+                                <th className="px-4 py-3">日期</th>
+                                <th className="px-4 py-3">星期</th>
+                                <th className="px-4 py-3 text-right">票務收入</th>
+                                <th className="px-4 py-3 text-right">包場收入</th>
+                                <th className="px-4 py-3 text-right">當日收入</th>
+                                <th className="px-4 py-3 text-right text-slate-500">發票筆數</th>
+                                <th className="px-4 py-3 text-right text-amber-600">平均交易價</th>
+                                <th className="px-4 py-3 text-right">體驗人次</th>
+                                <th className="px-4 py-3 text-right">包場人次</th>
+                                <th className="px-4 py-3 text-right text-cyan-700 font-bold">日均客單價</th>
+                                <th className="px-4 py-3">備註</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {ops2026Data.map((row) => (
+                                <tr key={row.day} className={`hover:bg-slate-50/50 ${row.isWeekend ? 'bg-orange-50/30' : ''}`}>
+                                    <td className="px-4 py-3 font-medium text-slate-700">{row.day} 日</td>
+                                    <td className={`px-4 py-3 ${row.isWeekend ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                                        {row.weekDay}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                                        ${new Intl.NumberFormat('en-US').format(row.ticketRevenue)}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-purple-600 font-mono">
+                                        ${new Intl.NumberFormat('en-US').format(row.privateEventRevenue)}
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-bold text-slate-800 font-mono">
+                                        ${new Intl.NumberFormat('en-US').format(row.revenue)}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-slate-500 font-mono">
+                                        {row.txCount > 0 ? row.txCount : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-amber-600 font-mono">
+                                        {row.atv > 0 ? `$${new Intl.NumberFormat('en-US').format(Math.round(row.atv))}` : '-'}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <span className="font-bold text-blue-600">{row.visitorCount}</span>
+                                            <button
+                                                onClick={() => setEditingGranularDate(row.dateStr)}
+                                                className="p-1 hover:bg-blue-100 text-blue-500 rounded transition-colors"
+                                                title="點擊編輯各項目明細"
+                                            >
+                                                <Edit3 className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-purple-500">{row.privateEventVisitors}</td>
+                                    <td className="px-4 py-3 text-right font-mono text-cyan-700 font-bold">
+                                        ${new Intl.NumberFormat('en-US').format(Math.round(row.dailyARPU))}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <input
+                                            type="text"
+                                            value={row.remark}
+                                            onChange={(e) => setRemarks(prev => ({ ...prev, [row.dateStr]: e.target.value }))}
+                                            placeholder="..."
+                                            className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm text-slate-700 transition-colors placeholder:text-slate-200"
+                                        />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+{/* Visitor Statistics Tab */ }
+{
+    activeTab === 'visitor_stats' && (
+        <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-blue-600" />
+                    兒童新樂園入園人次統計
+                </h3>
+
+                <div className="overflow-x-auto border rounded-lg">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                            <tr>
+                                <th className="px-6 py-3 text-center w-24">月份</th>
+                                <th className="px-6 py-3 text-right">2024年 入園人次</th>
+                                <th className="px-6 py-3 text-right">2025年 入園人次</th>
+                                <th className="px-6 py-3 text-right">2026年 入園人次</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+                                const v2024 = visitorData[2024]?.[m] || 0;
+                                const v2025 = visitorData[2025]?.[m] || 0;
+                                const v2026 = visitorData[2026]?.[m] || 0;
+
+                                return (
+                                    <tr key={m} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4 text-center font-medium text-slate-700">{m}月</td>
+                                        <td className="px-6 py-4 text-right font-mono text-slate-600">
+                                            {v2024 > 0 ? new Intl.NumberFormat('en-US').format(v2024) : '-'}
+                                        </td>
+                                        <td className="px-6 py-4 text-right font-mono text-blue-600 font-medium">
+                                            {v2025 > 0 ? new Intl.NumberFormat('en-US').format(v2025) : '-'}
+                                        </td>
+                                        <td className="px-6 py-4 text-right font-mono text-slate-400">
+                                            {v2026 > 0 ? new Intl.NumberFormat('en-US').format(v2026) : '-'}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {/* Total Row */}
+                            <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
+                                <td className="px-6 py-4 text-center text-slate-800">總計</td>
+                                <td className="px-6 py-4 text-right font-mono text-slate-800">
+                                    {new Intl.NumberFormat('en-US').format(
+                                        Object.values(visitorData[2024] || {}).reduce((a, b) => a + b, 0)
+                                    )}
+                                </td>
+                                <td className="px-6 py-4 text-right font-mono text-blue-700">
+                                    {new Intl.NumberFormat('en-US').format(
+                                        Object.values(visitorData[2025] || {}).reduce((a, b) => a + b, 0)
+                                    )}
+                                </td>
+                                <td className="px-6 py-4 text-right font-mono text-slate-500">
+                                    {new Intl.NumberFormat('en-US').format(
+                                        Object.values(visitorData[2026] || {}).reduce((a, b) => a + b, 0)
+                                    )}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div className="mt-4 text-xs text-slate-400 text-right">
+                    資料來源：兒童新樂園入園人次統計表 (PDF)
+                </div>
+            </div>
+        </div>
+    )
+}
+
+{
+    activeTab === 'marketing' && (
+        <div className="space-y-6 animate-in fade-in duration-500">
+            {/* Marketing Strategy Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-2xl text-white shadow-lg">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="bg-white/20 p-2 rounded-lg"><Target className="w-6 h-6" /></div>
+                        <h3 className="font-bold">校外教學轉化模式</h3>
+                    </div>
+                    <p className="text-sm text-indigo-100 mb-4">針對低預算學生族群，採取「班級對抗賽」與「多人同行優惠」。</p>
+                    <div className="flex justify-between items-end">
+                        <span className="text-xs bg-white/20 px-2 py-1 rounded">建議折扣: 75折</span>
+                        <button className="text-xs font-bold underline">查看方案細節</button>
+                    </div>
+                </div>
+                <div className="bg-gradient-to-br from-orange-400 to-rose-500 p-6 rounded-2xl text-white shadow-lg">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="bg-white/20 p-2 rounded-lg"><Users className="w-6 h-6" /></div>
+                        <h3 className="font-bold">10歲以下家庭引流</h3>
+                    </div>
+                    <p className="text-sm text-orange-100 mb-4">提供「AR 觀戰模式」與幼童親手贈品，解決無法戴頭盔的痛點。</p>
+                    <div className="flex justify-between items-end">
+                        <span className="text-xs bg-white/20 px-2 py-1 rounded">建議方案: 贈送貼紙</span>
+                        <button className="text-xs font-bold underline">查看方案細節</button>
+                    </div>
+                </div>
+                <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-6 rounded-2xl text-white shadow-lg">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="bg-white/20 p-2 rounded-lg"><Zap className="w-6 h-6" /></div>
+                        <h3 className="font-bold">美食街等餐經濟</h3>
+                    </div>
+                    <p className="text-sm text-emerald-100 mb-4">與 2F 美食街合辦「等餐 10 分鐘，XR 現折 50 元」活。活水引流。</p>
+                    <div className="flex justify-between items-end">
+                        <span className="text-xs bg-white/20 px-2 py-1 rounded">目標轉化: +15%</span>
+                        <button className="text-xs font-bold underline">查看方案細節</button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Campaign Management */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <Tag className="w-5 h-5 text-blue-600" />
+                        當前行銷活動管理
+                    </h3>
+                    <button
+                        onClick={() => setShowPromoModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-all"
+                    >
+                        <Plus className="w-4 h-4" />
+                        新增促銷代碼
+                    </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                            <tr>
+                                <th className="px-6 py-4">活動名稱</th>
+                                <th className="px-6 py-4">促銷代碼</th>
+                                <th className="px-6 py-4">類型</th>
+                                <th className="px-6 py-4 text-right">已使用</th>
+                                <th className="px-6 py-4 text-right">轉化額</th>
+                                <th className="px-6 py-4">狀態</th>
+                                <th className="px-6 py-4 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {marketingCampaigns.length === 0 ? (
+                                <tr>
+                                    <td className="px-6 py-8 text-center text-slate-400" colSpan={7}>目前無進行中的行銷活動。點擊上方按鈕新增。</td>
+                                </tr>
+                            ) : (
+                                marketingCampaigns.map((c, idx) => {
+                                    const stats = campaignStats[c.code] || { used: 0, revenue: 0 };
+                                    const isActive = new Date() >= new Date(c.startDate) && (!c.endDate || new Date() <= new Date(c.endDate));
+
+                                    return (
+                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-4 font-medium text-slate-800">{c.name}</td>
+                                            <td className="px-6 py-4">
+                                                <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded text-xs font-mono font-bold border border-blue-100 uppercase">
+                                                    {c.code}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-600">{c.type === 'discount' ? '折扣碼' : '贈品方案'}</td>
+                                            <td className="px-6 py-4 text-right font-mono font-bold text-blue-600">{stats.used} 次</td>
+                                            <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600">${stats.revenue.toLocaleString()}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
+                                                    <span className={`text-xs ${isActive ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
+                                                        {isActive ? '進行中' : '已結束'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button
+                                                    onClick={() => {
+                                                        const newList = marketingCampaigns.filter((_, i) => i !== idx);
+                                                        setMarketingCampaigns(newList);
+                                                        handleSaveMarketingCampaigns(newList);
+                                                    }}
+                                                    className="text-slate-300 hover:text-red-500 transition-colors"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {showPromoModal && (
+                <PromoCodeModal
+                    onClose={() => setShowPromoModal(false)}
+                    onSave={(newCampaign) => {
+                        const newList = [...marketingCampaigns, newCampaign];
+                        setMarketingCampaigns(newList);
+                        handleSaveMarketingCampaigns(newList);
+                        setShowPromoModal(false);
+                    }}
+                />
+            )}
+        </div>
+    )
+}
+
+{/* AI CFO Chatbot */ }
+<AiCfoChat
+    dataContext={{
+        stats,
+        overviewStats,
+        selectedYear,
+        selectedMonth,
+        yearPivotData,
+        growthStats,
+        target2026,
+        marketingCampaigns,
+        sampleGranular: Object.entries(granularData).slice(0, 5).map(([k, v]) => ({ date: k, ...v as any }))
+    }}
+/>
+        </div >
     );
 }
 
