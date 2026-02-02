@@ -4626,7 +4626,7 @@ function UploadButton() {
             ) : (
                 <>
                     <CloudRain className="w-4 h-4" />
-                    <span>上傳報表</span>
+                    <span>上傳雷門報表</span>
                 </>
             )}
         </label>
