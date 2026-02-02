@@ -1821,12 +1821,14 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         if (activeTab === 'ops2024') { year = 2024; monthsToLoad = [ops2024Month]; }
         else if (activeTab === 'ops2025') { year = 2025; monthsToLoad = [ops2025Month]; }
         else if (activeTab === 'ops2026') { year = 2026; monthsToLoad = [ops2026Month]; }
-        else if (activeTab === 'overview') {
+        else if (activeTab === 'overview' || activeTab === 'visitor_stats') {
             year = parseInt(selectedYear);
             if (activeTab === 'overview' && selectedMonth === 'All') {
                 monthsToLoad = Array.from({ length: 12 }, (_, i) => i + 1);
             } else if (activeTab === 'overview') {
                 monthsToLoad = [parseInt(selectedMonth)];
+            } else if (activeTab === 'visitor_stats') {
+                monthsToLoad = Array.from({ length: 12 }, (_, i) => i + 1); // Load all for visitor stats
             }
         }
 
