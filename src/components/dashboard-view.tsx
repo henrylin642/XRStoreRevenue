@@ -744,6 +744,8 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                 await updateSystemConfig(key, JSON.stringify(payload));
             }
             if (!silent) alert('數據及備註已成功儲存！');
+            // Refresh visitor stats summary to update top cards immediately
+            getVisitorStats().then(setVisitorData);
         } catch (e) {
             console.error(e);
             if (!silent) alert('儲存失敗');
@@ -1925,20 +1927,17 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
         const targetYear = parseInt(selectedYear);
         const targetMonth = selectedMonth === 'All' ? null : parseInt(selectedMonth);
 
-        Object.entries(granularData).forEach(([dateStr, data]) => {
-            if (!data) return;
-            // dateStr format YYYY-MM-DD
-            const [y, m, d] = dateStr.split('-').map(Number);
-            if (y === targetYear) {
-                if (targetMonth === null || m === targetMonth) {
-                    // Sum visitors
-                    if (data.attractions) {
-                        const dailySum = Object.values(data.attractions).reduce((a, b) => (a as number) + (b as number), 0) as number;
-                        totalVisitors += dailySum;
-                    }
-                }
+        // Use visitorData (Server Summary) for consistent Top Card numbers across all tabs
+        // visitorData structure: { [year]: { [month]: count } }
+        if (visitorData[targetYear]) {
+            if (targetMonth === null) {
+                // Sum all months for the year
+                totalVisitors = Object.values(visitorData[targetYear]).reduce((sum, count) => sum + (count || 0), 0);
+            } else {
+                // Get specific month
+                totalVisitors = visitorData[targetYear][targetMonth] || 0;
             }
-        });
+        }
 
         const revenuePerVisitor = totalVisitors > 0 ? Math.round(stats.totalRevenue / totalVisitors) : 0;
 
@@ -1946,7 +1945,7 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
             totalVisitors,
             revenuePerVisitor
         };
-    }, [granularData, selectedYear, selectedMonth, stats.totalRevenue]);
+    }, [visitorData, selectedYear, selectedMonth, stats.totalRevenue]);
 
     useEffect(() => {
         // Initial fetch of target configuration
