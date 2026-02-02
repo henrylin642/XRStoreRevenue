@@ -189,12 +189,12 @@ export function PricingStrategyView() {
                     </div>
                     <div className="h-[350px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                            <ScatterChart margin={{ top: 20, right: 20, bottom: 60, left: 60 }}>
                                 <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" dataKey="duration" name="時長" unit="分" domain={[0, 15]} label={{ value: '體驗時長 (分鐘)', position: 'bottom', offset: 0 }} />
-                                <YAxis type="number" dataKey="price" name="價格" unit="元" domain={[0, 350]} label={{ value: '價格 (TWD)', angle: -90, position: 'insideLeft' }} />
+                                <XAxis type="number" dataKey="duration" name="時長" unit="分" domain={[0, 15]} label={{ value: '體驗時長 (分鐘)', position: 'insideBottom', offset: -10 }} />
+                                <YAxis type="number" dataKey="price" name="價格" unit="元" domain={[0, 350]} label={{ value: '價格 (TWD)', angle: -90, position: 'insideLeft', offset: 0, dx: -20, style: { textAnchor: 'middle' } }} />
                                 <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
-                                <Legend />
+                                <Legend wrapperStyle={{ paddingTop: '24px' }} />
                                 <ReferenceLine y={100} stroke="#ef4444" strokeDasharray="3 3" label="高價門檻 $100" />
                                 <ReferenceLine x={5} stroke="#3b82f6" strokeDasharray="3 3" label="5分鐘界線" />
 
