@@ -2644,7 +2644,10 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     <>
                     <style dangerouslySetInnerHTML={{
                         __html: `
-                                < div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 no-print" >
+                    `}} />
+
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 print-section">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 no-print">
                                 <div>
                                     <h3 className="text-lg font-bold text-slate-800">{RECON_YEAR}對賬中心</h3>
                                     <p className="text-sm text-slate-500">僅針對 {RECON_YEAR} 年度，比對系統發票與平台交易數據 (依金額及時間自動匹配)</p>
@@ -2718,10 +2721,10 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                                         <span>上傳平台數據</span>
                                     </label>
                                 </div>
-                            </div>
+                            </div >
 
-                            {/* Print Header (Visible only when printing) */}
-            <div className="hidden print:block mb-6 border-b-2 border-slate-800 pb-4">
+        {/* Print Header (Visible only when printing) */ }
+        < div className = "hidden print:block mb-6 border-b-2 border-slate-800 pb-4" >
                 <h2 className="text-2xl font-black text-slate-900">對帳明細報表</h2>
                 <div className="flex justify-between items-end mt-2">
                     <p className="text-slate-600 text-sm">
@@ -2729,10 +2732,11 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     </p>
                     <p className="text-slate-400 text-xs">列印日期：{new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</p>
                 </div>
-            </div>
+            </div >
 
-            {isReconLoading ? (
-                <div className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+    {
+        isReconLoading?(
+                <div className = "py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50" >
                     <div className="p-4 bg-white rounded-full shadow-sm mb-4">
                         <Loader2 className="w-10 h-10 text-slate-300 animate-spin" />
                     </div>
@@ -2740,306 +2744,313 @@ export default function DashboardView({ transactions, session }: DashboardViewPr
                     <p className="text-slate-400 text-sm">正在讀取「{reconPaymentMethod}」的目前清單</p>
                 </div>
             ) : (platformData.length === 0 && reconSystemRecords.length === 0) ? (
-                <div className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                    <div className="p-4 bg-white rounded-full shadow-sm mb-4">
-                        <CreditCard className="w-10 h-10 text-slate-300" />
-                    </div>
-                    <h4 className="text-slate-600 font-medium mb-1">尚無可對帳資料</h4>
-                    <p className="text-slate-400 text-sm mb-6">請確認期間與支付方式，或上傳平台交易報表進行比對</p>
-                </div>
-            ) : (
-                <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                    <table className="w-full text-sm text-left border-collapse">
-                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-xs">
-                            <tr>
-                                <th className="px-4 py-3 border-r border-slate-200 bg-slate-100/50" colSpan={4}>系統發票紀錄 (左)</th>
-                                <th className="px-4 py-3 text-center border-r border-slate-200 w-24">對帳狀態</th>
-                                <th className="px-4 py-3 bg-slate-100/50" colSpan={3}>平台交易數據 (右)</th>
+        <div className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+            <div className="p-4 bg-white rounded-full shadow-sm mb-4">
+                <CreditCard className="w-10 h-10 text-slate-300" />
+            </div>
+            <h4 className="text-slate-600 font-medium mb-1">尚無可對帳資料</h4>
+            <p className="text-slate-400 text-sm mb-6">請確認期間與支付方式，或上傳平台交易報表進行比對</p>
+        </div>
+    ) : (
+        <div className="overflow-x-auto border border-slate-200 rounded-xl">
+            <table className="w-full text-sm text-left border-collapse">
+                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-xs">
+                    <tr>
+                        <th className="px-4 py-3 border-r border-slate-200 bg-slate-100/50" colSpan={4}>系統發票紀錄 (左)</th>
+                        <th className="px-4 py-3 text-center border-r border-slate-200 w-24">對帳狀態</th>
+                        <th className="px-4 py-3 bg-slate-100/50" colSpan={3}>平台交易數據 (右)</th>
+                    </tr>
+                    <tr className="bg-slate-50/80 border-b border-slate-200">
+                        <th className="px-4 py-2 font-medium">交易時間</th>
+                        <th className="px-4 py-2 font-medium">發票號碼</th>
+                        <th className="px-4 py-2 font-medium text-right">金額</th>
+                        <th className="px-4 py-2 font-medium border-r border-slate-200">備註</th>
+                        <th className="px-4 py-2 text-center border-r border-slate-200">-</th>
+                        <th className="px-4 py-2 font-medium">交易時間</th>
+                        <th className="px-4 py-2 font-medium">平台序號</th>
+                        <th className="px-4 py-2 font-medium text-right">金額</th>
+                        <th className="px-4 py-2 text-center w-10">-</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                    {reconciliationMatches.map((match, idx) => {
+                        const isMatched = match.status === 'matched';
+                        const isTopUp = match.status === 'topup_non_consume';
+                        const isRefundSkipped = match.status === 'refund_skipped';
+                        const sys = match.system;
+                        const plat = match.platform;
+
+                        const isError = !isMatched && !isTopUp && !isRefundSkipped;
+
+                        return (
+                            <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${isTopUp ? 'bg-blue-50/40' : (isError ? 'bg-red-50/30' : '')}`}>
+                                {/* System Info */}
+                                <td className={`px-4 py-3 text-xs ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-500')}`}>
+                                    {sys ? formatDateInTaipei(sys.date) : isTopUp ? '加值非消費' : '缺失記錄'}
+                                </td>
+                                <td className={`px-4 py-3 font-mono ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
+                                    {sys?.invoiceNumber || (isTopUp ? '加值非消費' : '無發票')}
+                                </td>
+                                <td className={`px-4 py-3 text-right font-mono font-medium ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
+                                    {sys ? `$${sys.amount.toLocaleString()}` : '-'}
+                                </td>
+                                <td className={`px-4 py-3 border-r border-slate-200 text-xs ${sys?.isSalesReturn ? (isError ? 'text-red-500 font-bold' : 'text-amber-600 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-400')}`}>
+                                    {sys?.isSalesReturn ? '銷退' : (isTopUp ? '加值非消費' : '')}
+                                </td>
+
+                                {/* Status Icon */}
+                                <td className="px-4 py-3 text-center border-r border-slate-200">
+                                    {isMatched ? (
+                                        <div className="flex flex-col items-center">
+                                            <CheckCircle className="w-5 h-5 text-green-500" />
+                                            <span className="text-[10px] text-green-600 font-bold mt-1">已對齊</span>
+                                        </div>
+                                    ) : isTopUp ? (
+                                        <div className="flex flex-col items-center">
+                                            <Zap className="w-5 h-5 text-blue-500" />
+                                            <span className="text-[10px] text-blue-600 font-bold mt-1">加值非消費</span>
+                                        </div>
+                                    ) : isRefundSkipped ? (
+                                        <div className="flex flex-col items-center">
+                                            <CheckCircle className="w-5 h-5 text-amber-500" />
+                                            <span className="text-[10px] text-amber-600 font-bold mt-1">平台不計</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center">
+                                            <AlertTriangle className="w-5 h-5 text-red-500" />
+                                            <span className="text-[10px] text-red-600 font-bold mt-1">未匹配</span>
+                                        </div>
+                                    )}
+                                </td>
+
+                                {/* Platform Info */}
+                                <td className={`px-4 py-3 text-xs ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-500')}`}>
+                                    {plat ? formatDateInTaipei(plat.date) : (isRefundSkipped ? '-' : '缺失記錄')}
+                                </td>
+                                <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-600')}`} title={plat?.txId}>
+                                    {plat?.txId || (isRefundSkipped ? '-' : '-')}
+                                </td>
+                                <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
+                                    {plat ? `$${plat.amount.toLocaleString()}` : (isRefundSkipped ? '-' : '-')}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                    {plat && (
+                                        <button
+                                            onClick={() => setInspectedRow(plat.raw)}
+                                            className="p-1 hover:bg-slate-200 rounded-md transition-colors text-slate-400 hover:text-blue-600"
+                                            title="查看原始數據"
+                                        >
+                                            <Info className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </td>
                             </tr>
-                            <tr className="bg-slate-50/80 border-b border-slate-200">
-                                <th className="px-4 py-2 font-medium">交易時間</th>
-                                <th className="px-4 py-2 font-medium">發票號碼</th>
-                                <th className="px-4 py-2 font-medium text-right">金額</th>
-                                <th className="px-4 py-2 font-medium border-r border-slate-200">備註</th>
-                                <th className="px-4 py-2 text-center border-r border-slate-200">-</th>
-                                <th className="px-4 py-2 font-medium">交易時間</th>
-                                <th className="px-4 py-2 font-medium">平台序號</th>
-                                <th className="px-4 py-2 font-medium text-right">金額</th>
-                                <th className="px-4 py-2 text-center w-10">-</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {reconciliationMatches.map((match, idx) => {
-                                const isMatched = match.status === 'matched';
-                                const isTopUp = match.status === 'topup_non_consume';
-                                const isRefundSkipped = match.status === 'refund_skipped';
-                                const sys = match.system;
-                                const plat = match.platform;
+                        );
+                    })}
+                </tbody>
+            </table>
+        </div>
+    )
+}
 
-                                const isError = !isMatched && !isTopUp && !isRefundSkipped;
+{
+    platformData.length > 0 && (
+        <div className="mt-6 flex items-center justify-between no-print">
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={() => window.print()}
+                    className="flex items-center gap-2 px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-all shadow-lg active:scale-95"
+                >
+                    <Printer className="w-4 h-4" />
+                    <span>列印對賬狀態</span>
+                </button>
+                <button
+                    onClick={handleCompleteReconciliation}
+                    className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
+                >
+                    <CheckCircle className="w-4 h-4" />
+                    <span>完成對賬</span>
+                </button>
+            </div>
 
-                                return (
-                                    <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${isTopUp ? 'bg-blue-50/40' : (isError ? 'bg-red-50/30' : '')}`}>
-                                        {/* System Info */}
-                                        <td className={`px-4 py-3 text-xs ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-500')}`}>
-                                            {sys ? formatDateInTaipei(sys.date) : isTopUp ? '加值非消費' : '缺失記錄'}
-                                        </td>
-                                        <td className={`px-4 py-3 font-mono ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
-                                            {sys?.invoiceNumber || (isTopUp ? '加值非消費' : '無發票')}
-                                        </td>
-                                        <td className={`px-4 py-3 text-right font-mono font-medium ${(!sys || (sys.isSalesReturn && isError)) ? 'text-red-500 font-bold' : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
-                                            {sys ? `$${sys.amount.toLocaleString()}` : '-'}
-                                        </td>
-                                        <td className={`px-4 py-3 border-r border-slate-200 text-xs ${sys?.isSalesReturn ? (isError ? 'text-red-500 font-bold' : 'text-amber-600 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-400')}`}>
-                                            {sys?.isSalesReturn ? '銷退' : (isTopUp ? '加值非消費' : '')}
-                                        </td>
+            <button
+                onClick={async () => {
+                    applyReconPlatformData([], true);
+                    setIsMatching(false);
+                    try {
+                        await persistReconPlatformData(reconPaymentMethod, []);
+                    } catch (e) {
+                        console.error('Failed to clear platform data:', e);
+                    }
+                }}
+                className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-red-500 font-medium transition-colors text-sm"
+            >
+                <Trash2 className="w-4 h-4" />
+                <span>清除目前比對資料</span>
+            </button>
+        </div>
+    )
+}
 
-                                        {/* Status Icon */}
-                                        <td className="px-4 py-3 text-center border-r border-slate-200">
-                                            {isMatched ? (
-                                                <div className="flex flex-col items-center">
-                                                    <CheckCircle className="w-5 h-5 text-green-500" />
-                                                    <span className="text-[10px] text-green-600 font-bold mt-1">已對齊</span>
-                                                </div>
-                                            ) : isTopUp ? (
-                                                <div className="flex flex-col items-center">
-                                                    <Zap className="w-5 h-5 text-blue-500" />
-                                                    <span className="text-[10px] text-blue-600 font-bold mt-1">加值非消費</span>
-                                                </div>
-                                            ) : isRefundSkipped ? (
-                                                <div className="flex flex-col items-center">
-                                                    <CheckCircle className="w-5 h-5 text-amber-500" />
-                                                    <span className="text-[10px] text-amber-600 font-bold mt-1">平台不計</span>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col items-center">
-                                                    <AlertTriangle className="w-5 h-5 text-red-500" />
-                                                    <span className="text-[10px] text-red-600 font-bold mt-1">未匹配</span>
-                                                </div>
-                                            )}
-                                        </td>
-
-                                        {/* Platform Info */}
-                                        <td className={`px-4 py-3 text-xs ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-500')}`}>
-                                            {plat ? formatDateInTaipei(plat.date) : (isRefundSkipped ? '-' : '缺失記錄')}
-                                        </td>
-                                        <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-600')}`} title={plat?.txId}>
-                                            {plat?.txId || (isRefundSkipped ? '-' : '-')}
-                                        </td>
-                                        <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? (isRefundSkipped ? 'text-slate-400' : 'text-red-500 font-bold') : (isTopUp ? 'text-blue-500 font-bold' : 'text-slate-700')}`}>
-                                            {plat ? `$${plat.amount.toLocaleString()}` : (isRefundSkipped ? '-' : '-')}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {plat && (
-                                                <button
-                                                    onClick={() => setInspectedRow(plat.raw)}
-                                                    className="p-1 hover:bg-slate-200 rounded-md transition-colors text-slate-400 hover:text-blue-600"
-                                                    title="查看原始數據"
-                                                >
-                                                    <Info className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {platformData.length > 0 && (
-                <div className="mt-6 flex items-center justify-between no-print">
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => window.print()}
-                            className="flex items-center gap-2 px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-all shadow-lg active:scale-95"
-                        >
-                            <Printer className="w-4 h-4" />
-                            <span>列印對賬狀態</span>
-                        </button>
-                        <button
-                            onClick={handleCompleteReconciliation}
-                            className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
-                        >
-                            <CheckCircle className="w-4 h-4" />
-                            <span>完成對賬</span>
-                        </button>
-                    </div>
-
+{/* Raw Data Inspector Modal */ }
+{
+    inspectedRow && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                        <Info className="w-5 h-5 text-blue-500" />
+                        原始數據檢查器 (Platform Row Data)
+                    </h3>
                     <button
-                        onClick={async () => {
-                            applyReconPlatformData([], true);
-                            setIsMatching(false);
-                            try {
-                                await persistReconPlatformData(reconPaymentMethod, []);
-                            } catch (e) {
-                                console.error('Failed to clear platform data:', e);
-                            }
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-red-500 font-medium transition-colors text-sm"
+                        onClick={() => setInspectedRow(null)}
+                        className="p-2 hover:bg-slate-200 rounded-full transition-colors"
                     >
-                        <Trash2 className="w-4 h-4" />
-                        <span>清除目前比對資料</span>
+                        <X className="w-5 h-5 text-slate-500" />
                     </button>
                 </div>
-            )}
-
-            {/* Raw Data Inspector Modal */}
-            {inspectedRow && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                <Info className="w-5 h-5 text-blue-500" />
-                                原始數據檢查器 (Platform Row Data)
-                            </h3>
-                            <button
-                                onClick={() => setInspectedRow(null)}
-                                className="p-2 hover:bg-slate-200 rounded-full transition-colors"
-                            >
-                                <X className="w-5 h-5 text-slate-500" />
-                            </button>
-                        </div>
-                        <div className="p-6 overflow-y-auto">
-                            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                                {Object.entries(inspectedRow).map(([key, val]) => (
-                                    <div key={key} className="border-b border-slate-50 pb-2">
-                                        <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">{key}</span>
-                                        <span className="text-sm text-slate-700 font-mono break-all">
-                                            {typeof val === 'number' && val > 10000000 ? val.toFixed(0) : String(val)}
-                                        </span>
-                                    </div>
-                                ))}
+                <div className="p-6 overflow-y-auto">
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                        {Object.entries(inspectedRow).map(([key, val]) => (
+                            <div key={key} className="border-b border-slate-50 pb-2">
+                                <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">{key}</span>
+                                <span className="text-sm text-slate-700 font-mono break-all">
+                                    {typeof val === 'number' && val > 10000000 ? val.toFixed(0) : String(val)}
+                                </span>
                             </div>
-                        </div>
-                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-                            <button
-                                onClick={() => setInspectedRow(null)}
-                                className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg"
-                            >
-                                關閉
-                            </button>
-                        </div>
+                        ))}
                     </div>
                 </div>
-            )}
-
-            {reconRecordDetail && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                            <div>
-                                <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                    <Info className="w-5 h-5 text-blue-500" />
-                                    對賬記錄
-                                </h3>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    {reconRecordDetail.method} / {reconRecordDetail.month}
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => setReconRecordDetail(null)}
-                                className="p-2 hover:bg-slate-200 rounded-full transition-colors"
-                            >
-                                <X className="w-5 h-5 text-slate-500" />
-                            </button>
-                        </div>
-                        <div className="p-6 overflow-y-auto space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                    <div className="text-xs text-slate-500">對賬時間</div>
-                                    <div className="font-semibold text-slate-700">{formatDateInTaipei(reconRecordDetail.reconciledAt)}</div>
-                                </div>
-                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                    <div className="text-xs text-slate-500">對賬區間</div>
-                                    <div className="font-semibold text-slate-700">{reconRecordDetail.rangeStart} ~ {reconRecordDetail.rangeEnd}</div>
-                                </div>
-                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                    <div className="text-xs text-slate-500">付款方式</div>
-                                    <div className="font-semibold text-slate-700">{reconRecordDetail.method}</div>
-                                </div>
-                            </div>
-
-                            <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-slate-50 border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-4 py-3 text-center border-r border-slate-200 w-24">對賬狀態</th>
-                                            <th className="px-4 py-3 text-slate-600 font-bold">系統交易時間</th>
-                                            <th className="px-4 py-3 text-slate-600 font-bold">訂單編號</th>
-                                            <th className="px-4 py-3 text-right text-slate-600 font-bold">系統金額</th>
-                                            <th className="px-4 py-3 text-slate-600 font-bold">發票號碼</th>
-                                            <th className="px-4 py-3 text-slate-600 font-bold">平台交易時間</th>
-                                            <th className="px-4 py-3 text-slate-600 font-bold">平台序號</th>
-                                            <th className="px-4 py-3 text-right text-slate-600 font-bold">平台金額</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {reconRecordDetail.matches?.map((match: any, idx: number) => {
-                                            const sys = match.system;
-                                            const plat = match.platform;
-                                            const status = match.status;
-                                            return (
-                                                <tr key={`${match.status}-${idx}`} className="hover:bg-slate-50">
-                                                    <td className="px-4 py-3 text-center border-r border-slate-200">
-                                                        {status === 'matched' ? (
-                                                            <div className="flex flex-col items-center">
-                                                                <CheckCircle className="w-5 h-5 text-emerald-500" />
-                                                                <span className="text-[10px] text-emerald-600 font-bold mt-1">已匹配</span>
-                                                            </div>
-                                                        ) : status === 'refund_skipped' ? (
-                                                            <div className="flex flex-col items-center">
-                                                                <CheckCircle className="w-5 h-5 text-amber-500" />
-                                                                <span className="text-[10px] text-amber-600 font-bold mt-1">平台不計</span>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex flex-col items-center">
-                                                                <AlertTriangle className="w-5 h-5 text-red-500" />
-                                                                <span className="text-[10px] text-red-600 font-bold mt-1">未匹配</span>
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className={`px-4 py-3 text-xs ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
-                                                        {sys ? formatDateInTaipei(sys.date) : '缺失記錄'}
-                                                    </td>
-                                                    <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
-                                                        {sys?.id || '-'}
-                                                    </td>
-                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${!sys ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
-                                                        {sys ? `$${Number(sys.amount).toLocaleString()}` : '-'}
-                                                    </td>
-                                                    <td className={`px-4 py-3 font-mono ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
-                                                        {sys?.invoiceNumber || '無發票'}
-                                                    </td>
-                                                    <td className={`px-4 py-3 text-xs ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-500'}`}>
-                                                        {plat ? formatDateInTaipei(plat.date) : (status === 'refund_skipped' ? '-' : '缺失記錄')}
-                                                    </td>
-                                                    <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-600'}`}>
-                                                        {plat?.txId || (status === 'refund_skipped' ? '-' : '-')}
-                                                    </td>
-                                                    <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-700'}`}>
-                                                        {plat ? `$${Number(plat.amount).toLocaleString()}` : (status === 'refund_skipped' ? '-' : '-')}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-                            <button
-                                onClick={() => setReconRecordDetail(null)}
-                                className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg"
-                            >
-                                關閉
-                            </button>
-                        </div>
-                    </div>
+                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                    <button
+                        onClick={() => setInspectedRow(null)}
+                        className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg"
+                    >
+                        關閉
+                    </button>
                 </div>
-            )}
+            </div>
         </div>
+    )
+}
+
+{
+    reconRecordDetail && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                    <div>
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                            <Info className="w-5 h-5 text-blue-500" />
+                            對賬記錄
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1">
+                            {reconRecordDetail.method} / {reconRecordDetail.month}
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => setReconRecordDetail(null)}
+                        className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+                    >
+                        <X className="w-5 h-5 text-slate-500" />
+                    </button>
+                </div>
+                <div className="p-6 overflow-y-auto space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <div className="text-xs text-slate-500">對賬時間</div>
+                            <div className="font-semibold text-slate-700">{formatDateInTaipei(reconRecordDetail.reconciledAt)}</div>
+                        </div>
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <div className="text-xs text-slate-500">對賬區間</div>
+                            <div className="font-semibold text-slate-700">{reconRecordDetail.rangeStart} ~ {reconRecordDetail.rangeEnd}</div>
+                        </div>
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <div className="text-xs text-slate-500">付款方式</div>
+                            <div className="font-semibold text-slate-700">{reconRecordDetail.method}</div>
+                        </div>
+                    </div>
+
+                    <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                        <table className="w-full text-sm">
+                            <thead className="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                    <th className="px-4 py-3 text-center border-r border-slate-200 w-24">對賬狀態</th>
+                                    <th className="px-4 py-3 text-slate-600 font-bold">系統交易時間</th>
+                                    <th className="px-4 py-3 text-slate-600 font-bold">訂單編號</th>
+                                    <th className="px-4 py-3 text-right text-slate-600 font-bold">系統金額</th>
+                                    <th className="px-4 py-3 text-slate-600 font-bold">發票號碼</th>
+                                    <th className="px-4 py-3 text-slate-600 font-bold">平台交易時間</th>
+                                    <th className="px-4 py-3 text-slate-600 font-bold">平台序號</th>
+                                    <th className="px-4 py-3 text-right text-slate-600 font-bold">平台金額</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {reconRecordDetail.matches?.map((match: any, idx: number) => {
+                                    const sys = match.system;
+                                    const plat = match.platform;
+                                    const status = match.status;
+                                    return (
+                                        <tr key={`${match.status}-${idx}`} className="hover:bg-slate-50">
+                                            <td className="px-4 py-3 text-center border-r border-slate-200">
+                                                {status === 'matched' ? (
+                                                    <div className="flex flex-col items-center">
+                                                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                                                        <span className="text-[10px] text-emerald-600 font-bold mt-1">已匹配</span>
+                                                    </div>
+                                                ) : status === 'refund_skipped' ? (
+                                                    <div className="flex flex-col items-center">
+                                                        <CheckCircle className="w-5 h-5 text-amber-500" />
+                                                        <span className="text-[10px] text-amber-600 font-bold mt-1">平台不計</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col items-center">
+                                                        <AlertTriangle className="w-5 h-5 text-red-500" />
+                                                        <span className="text-[10px] text-red-600 font-bold mt-1">未匹配</span>
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className={`px-4 py-3 text-xs ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
+                                                {sys ? formatDateInTaipei(sys.date) : '缺失記錄'}
+                                            </td>
+                                            <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
+                                                {sys?.id || '-'}
+                                            </td>
+                                            <td className={`px-4 py-3 text-right font-mono font-medium ${!sys ? 'text-red-500 font-bold' : 'text-slate-700'}`}>
+                                                {sys ? `$${Number(sys.amount).toLocaleString()}` : '-'}
+                                            </td>
+                                            <td className={`px-4 py-3 font-mono ${!sys ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
+                                                {sys?.invoiceNumber || '無發票'}
+                                            </td>
+                                            <td className={`px-4 py-3 text-xs ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-500'}`}>
+                                                {plat ? formatDateInTaipei(plat.date) : (status === 'refund_skipped' ? '-' : '缺失記錄')}
+                                            </td>
+                                            <td className={`px-4 py-3 font-mono truncate max-w-[120px] ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-600'}`}>
+                                                {plat?.txId || (status === 'refund_skipped' ? '-' : '-')}
+                                            </td>
+                                            <td className={`px-4 py-3 text-right font-mono font-medium ${!plat ? (status === 'refund_skipped' ? 'text-slate-400' : 'text-red-500 font-bold') : 'text-slate-700'}`}>
+                                                {plat ? `$${Number(plat.amount).toLocaleString()}` : (status === 'refund_skipped' ? '-' : '-')}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                    <button
+                        onClick={() => setReconRecordDetail(null)}
+                        className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg"
+                    >
+                        關閉
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+        </div >
                     </div >
                 )
 }
